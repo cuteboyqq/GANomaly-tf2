@@ -1,7 +1,7 @@
 # GANomaly-tf2
 
 
-## Train and Evaluate
+## Train , Validate, Infer
 
 ```bash
 # cifar10
