@@ -23,7 +23,7 @@ python train.py --log_dir=log --anomaly=2 --dataset=mnist --isize=32 --nc=1
 
 ### Notebooks
 
-- [mnist_example.ipynb](https://github.com/chychen/tf2_ganomaly/blob/master/mnist_example.ipynb)
+- [mnist_example.ipynb](mnist_example.ipynb)
 
 ## Reference
 
