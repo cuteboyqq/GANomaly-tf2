@@ -14,11 +14,11 @@ from absl import logging
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("shuffle_buffer_size", 10000,
                      "buffer size for pseudo shuffle")
-flags.DEFINE_integer("batch_size", 300, "batch_size")
-flags.DEFINE_integer("isize", 32, "input size")
+flags.DEFINE_integer("batch_size", 64, "batch_size")
+flags.DEFINE_integer("isize", 64, "input size")
 flags.DEFINE_string("ckpt_dir", 'ckpt', "checkpoint folder")
 flags.DEFINE_integer("nz", 100, "latent dims")
-flags.DEFINE_integer("nc", 1, "input channels")
+flags.DEFINE_integer("nc", 3, "input channels")
 flags.DEFINE_integer("ndf", 64, "number of discriminator's filters")
 flags.DEFINE_integer("ngf", 64, "number of generator's filters")
 flags.DEFINE_integer("extralayers", 0, "extralayers for both G and D")
@@ -55,7 +55,7 @@ def main(_):
     if FLAGS.log_dir:
         if not os.path.exists(FLAGS.log_dir):
             os.makedirs(FLAGS.log_dir)
-        logging.get_absl_handler().use_absl_log_file(FLAGS.dataset, log_dir=FLAGS.log_dir)
+    '''
     # dataset
     if opt.dataset=='mnist':
         data_train, data_test = tf.keras.datasets.mnist.load_data()
@@ -91,18 +91,41 @@ def main(_):
         opt.batch_size, drop_remainder=True)
     test_dataset = test_dataset.batch(opt.batch_size, drop_remainder=False)
     test_dataset = test_dataset.shuffle(buffer_size=len(y_test))
+    '''
+    train_data_dir = '/home/ali/GitHub_Code/YOLO/YOLOV5/runs/detect/f_384_2min/crops_1cls'
+    img_height = 64
+    img_width = 64
+    batch_size = 64
+    train_ds = tf.keras.utils.image_dataset_from_directory(
+      train_data_dir,
+      validation_split=0.1,
+      subset="training",
+      seed=123,
+      image_size=(img_height, img_width),
+      batch_size=batch_size)
+    
+    val_data_dir = '/home/ali/GitHub_Code/YOLO/YOLOV5/runs/detect/f_384_2min/test'
+    val_ds = tf.keras.utils.image_dataset_from_directory(
+      val_data_dir,
+      validation_split=0.1,
+      subset="validation",
+      seed=123,
+      image_size=(img_height, img_width),
+      batch_size=batch_size)
+    
+    
     TRAIN = False
     ganomaly = GANomaly(opt,
-                        train_dataset,
+                        train_ds,
                         valid_dataset=None,
-                        test_dataset=test_dataset)
+                        test_dataset=val_ds)
     if TRAIN:
         # training
         ganomaly.fit(opt.niter)
     
         # evaluating
-        ganomaly.evaluate_best(test_dataset)
+        ganomaly.evaluate_best(val_ds)
     else:
-        ganomaly.infer(test_dataset)
+        ganomaly.infer(val_ds)
 if __name__ == '__main__':
     app.run(main)
