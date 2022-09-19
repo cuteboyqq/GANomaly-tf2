@@ -450,8 +450,8 @@ class GANomaly(GANRunner):
         self.show_max_num = 5
         
     def renormalize(self, tensor):
-        minFrom= tensor.min()
-        maxFrom= tensor.max()
+        minFrom= tf.math.reduce_min(tensor)
+        maxFrom= tf.math.reduce_max(tensor)
         minTo = 0
         maxTo=1
         return minTo + (maxTo - minTo) * ((tensor - minFrom) / (maxFrom - minFrom))
@@ -478,6 +478,10 @@ class GANomaly(GANRunner):
             #g_loss = 0.0
             images = self.input.cpu().numpy()
             fake_img = self.gen_img.cpu().numpy()
+            
+            images = self.renormalize(images)
+            fake_img = self.renormalize(fake_img)
+            
             if show_img:
                 plt = self.plot_images(images,fake_img)
                 if data_type=='normal':
@@ -504,8 +508,8 @@ class GANomaly(GANRunner):
         for images, row in zip([images, outputs], axes):
             
             for img, ax in zip(images, row):
-                file_name = 'infer_'
                 #img = img[:,:,::-1].transpose((2,1,0))
+                
                 ax.imshow(img)
                 ax.get_xaxis().set_visible(False)
                 ax.get_yaxis().set_visible(False)

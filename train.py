@@ -123,6 +123,27 @@ def main(_):
         test_dataset = test_dataset.batch(opt.batch_size, drop_remainder=False)
         test_dataset = test_dataset.shuffle(buffer_size=len(y_test))
     else:
+        '''
+        Use Custom dataaset
+        tf.keras.utils.image_dataset_from_directory(
+                                        directory,
+                                        labels='inferred',
+                                        label_mode='int',
+                                        class_names=None,
+                                        color_mode='rgb',
+                                        batch_size=32,
+                                        image_size=(256, 256),
+                                        shuffle=True,
+                                        seed=None,
+                                        validation_split=None,
+                                        subset=None,
+                                        interpolation='bilinear',
+                                        follow_links=False,
+                                        crop_to_aspect_ratio=False,
+                                        **kwargs
+                                    )
+
+        '''
         #raise NotImplementError
         train_data_dir = opt.dataset
         img_height = opt.isize
@@ -138,8 +159,10 @@ def main(_):
         
         if show_img==True:
             batch_size_=opt.batch_size
+            shuffle=True
         else:
             batch_size_=1
+            shuffle=False
             
         val_data_dir = opt.dataset_test
         print(val_data_dir)
@@ -148,6 +171,7 @@ def main(_):
           val_data_dir,
           #validation_split=0.1,
           #subset="validation",
+          shuffle=shuffle,
           seed=123,
           image_size=(img_height, img_width),
           batch_size=batch_size_)
@@ -159,6 +183,7 @@ def main(_):
           val_data_abnormal_dir,
           #validation_split=0.1,
           #subset="validation",
+          shuffle=shuffle,
           seed=123,
           image_size=(img_height, img_width),
           batch_size=batch_size_)
