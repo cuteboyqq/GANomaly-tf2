@@ -6,7 +6,7 @@ from tensorflow.keras import layers
 import metrics
 from absl import logging
 import matplotlib.pyplot as plt
-
+import os
 class Conv_BN_Act(tf.keras.layers.Layer):
     def __init__(self,
                  filters,
@@ -456,31 +456,83 @@ class GANomaly(GANRunner):
         maxTo=1
         return minTo + (maxTo - minTo) * ((tensor - minFrom) / (maxFrom - minFrom))
     
-    def infer(self, test_dataset):
+    def infer(self, test_dataset,SHOW_MAX_NUM,show_img,data_type):
         show_num = 0
         self.load_best()
-        SHOW_MAX_NUM = 5
+        
+        
+        loss_list = []
         dataiter = iter(test_dataset)
         #for step, (images, y_batch_train) in enumerate(test_dataset):
+        cnt=1
+        os.makedirs('./runs/detect',exist_ok=True)
         while(show_num < SHOW_MAX_NUM):
             images, labels = dataiter.next()
-            latent_i, fake_img, latent_o = self.G(images)
-            images = images.cpu().numpy()
-            fake_img = fake_img.cpu().numpy()
-            self.plot_images(images,fake_img)
+            #latent_i, fake_img, latent_o = self.G(images)
+            self.input = images
+            
+            self.latent_i, self.gen_img, self.latent_o = self.G(self.input)
+            self.pred_real, self.feat_real = self.D(self.input)
+            self.pred_fake, self.feat_fake = self.D(self.gen_img)
+            g_loss = self.g_loss()
+            #g_loss = 0.0
+            images = self.input.cpu().numpy()
+            fake_img = self.gen_img.cpu().numpy()
+            if show_img:
+                plt = self.plot_images(images,fake_img)
+                if data_type=='normal':
+                    file_name = 'infer_normal' + str(cnt) + '.jpg'
+                else:
+                    file_name = 'infer_abnormal' + str(cnt) + '.jpg'
+                file_path = os.path.join('./runs/detect',file_name)
+                plt.savefig(file_path)
+                cnt+=1
+            if data_type=='normal':
+                print('{} normal: {}'.format(show_num,g_loss.numpy()))
+            else:
+                print('{} abnormal: {}'.format(show_num,g_loss.numpy()))
+            loss_list.append(g_loss.numpy())
             show_num+=1
-    
+            #if show_num%20==0:
+                #print(show_num)
+        return loss_list
     def plot_images(self,images,outputs):
         # plot the first ten input images and then reconstructed images
         fig, axes = plt.subplots(nrows=2, ncols=15, sharex=True, sharey=True, figsize=(25,4))
         
         # input images on top row, reconstructions on bottom
         for images, row in zip([images, outputs], axes):
+            
             for img, ax in zip(images, row):
+                file_name = 'infer_'
                 #img = img[:,:,::-1].transpose((2,1,0))
                 ax.imshow(img)
                 ax.get_xaxis().set_visible(False)
                 ax.get_yaxis().set_visible(False)
+        
+        return plt
+    
+    def plot_loss_distribution(self, SHOW_MAX_NUM,positive_loss,defeat_loss):
+        # Importing packages
+        import matplotlib.pyplot as plt2
+        # Define data values
+        x = [i for i in range(SHOW_MAX_NUM)]
+        y = positive_loss
+        z = defeat_loss
+        print(x)
+        print(positive_loss)
+        print(defeat_loss)
+        # Plot a simple line chart
+        #plt2.plot(x, y)
+        # Plot another line on the same chart/graph
+        #plt2.plot(x, z)
+        plt2.scatter(x,y,s=1)
+        plt2.scatter(x,z,s=1) 
+        os.makedirs('./runs/detect',exist_ok=True)
+        file_path = os.path.join('./runs/detect','loss_distribution.jpg')
+        plt2.savefig(file_path)
+        plt2.show()
+        
     
     
     def _evaluate(self, test_dataset):
