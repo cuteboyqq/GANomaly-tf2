@@ -453,7 +453,7 @@ class GANomaly(GANRunner):
         minFrom= tf.math.reduce_min(tensor)
         maxFrom= tf.math.reduce_max(tensor)
         minTo = 0
-        maxTo=1
+        maxTo = 1
         return minTo + (maxTo - minTo) * ((tensor - minFrom) / (maxFrom - minFrom))
     
     def infer(self, test_dataset,SHOW_MAX_NUM,show_img,data_type):
@@ -476,10 +476,13 @@ class GANomaly(GANRunner):
             self.pred_fake, self.feat_fake = self.D(self.gen_img)
             g_loss = self.g_loss()
             #g_loss = 0.0
-            
-            images = self.renormalize(images)
+            #print("input")
+            #print(self.input)
+            #print("gen_img")
+            #print(self.gen_img)
+            images = self.renormalize(self.input)
             fake_img = self.renormalize(self.gen_img)
-            
+            #fake_img = self.gen_img
             images = images.cpu().numpy()
             fake_img = fake_img.cpu().numpy()
             #fake_img = self.gen_img
@@ -510,7 +513,8 @@ class GANomaly(GANRunner):
         for images2, row in zip([images,outputs], axes):     
             for img, ax in zip(images2, row):
                 #img = img[:,:,::-1].transpose((2,1,0))
-                ax.imshow(img[:,:])
+                #print(img)
+                ax.imshow(img)
                 ax.get_xaxis().set_visible(False)
                 ax.get_yaxis().set_visible(False)
         return plt

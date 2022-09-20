@@ -14,7 +14,7 @@ from absl import logging
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("shuffle_buffer_size", 10000,
                      "buffer size for pseudo shuffle")
-flags.DEFINE_integer("batch_size", 128, "batch_size")
+flags.DEFINE_integer("batch_size", 15, "batch_size")
 flags.DEFINE_integer("isize", 32, "input size")
 flags.DEFINE_string("ckpt_dir", 'ckpt', "checkpoint folder")
 flags.DEFINE_integer("nz", 100, "latent dims")
@@ -24,7 +24,7 @@ flags.DEFINE_integer("ngf", 64, "number of generator's filters")
 flags.DEFINE_integer("extralayers", 0, "extralayers for both G and D")
 flags.DEFINE_list("encdims", None, "Layer dimensions of the encoder and in reverse of the decoder."
                                    "If given, dense encoder and decoders are used.")
-flags.DEFINE_integer("niter",20,"number of training epochs")
+flags.DEFINE_integer("niter",90,"number of training epochs")
 flags.DEFINE_float("lr", 2e-4, "learning rate")
 flags.DEFINE_float("w_adv", 1., "Adversarial loss weight")
 flags.DEFINE_float("w_con", 50., "Reconstruction loss weight")
@@ -52,6 +52,9 @@ def batch_resize(imgs, size: tuple):
         img_out[i] = cv2.resize(imgs[i], size, interpolation=cv2.INTER_CUBIC)
     return img_out
 
+def process(image,label):
+    image = tf.cast(image/255. ,tf.float32)
+    return image,label
 
 def main(_):
     show_img = False
@@ -159,6 +162,9 @@ def main(_):
           seed=123,
           image_size=(img_height, img_width),
           batch_size=batch_size)
+        
+        train_dataset = train_dataset.map(process)
+        
         if TRAIN == False:
             if show_img==True:
                 batch_size_=opt.batch_size
@@ -182,6 +188,8 @@ def main(_):
           image_size=(img_height, img_width),
           batch_size=batch_size_)
         
+        test_dataset = test_dataset.map(process)
+        
         infer_data_dir = opt.dataset_infer
         print(infer_data_dir)
         print(batch_size_)
@@ -193,6 +201,8 @@ def main(_):
           seed=123,
           image_size=(img_height, img_width),
           batch_size=batch_size_)
+        
+        infer_dataset = infer_dataset.map(process)
         
         infer_data_abnormal_dir = opt.dataset_infer_abnormal
         print(infer_data_abnormal_dir)
@@ -206,7 +216,7 @@ def main(_):
           image_size=(img_height, img_width),
           batch_size=batch_size_)
     
-    
+        infer_dataset_abnormal = infer_dataset_abnormal.map(process)
     
     ganomaly = GANomaly(opt,
                         train_dataset,
@@ -222,7 +232,7 @@ def main(_):
         if show_img:
             SHOW_MAX_NUM = 5
         else:
-            SHOW_MAX_NUM = 1500
+            SHOW_MAX_NUM = 1900
         positive_loss = ganomaly.infer(infer_dataset,SHOW_MAX_NUM,show_img,'normal')
         defeat_loss = ganomaly.infer(infer_dataset_abnormal,SHOW_MAX_NUM,show_img,'abnormal')
         if not show_img:
