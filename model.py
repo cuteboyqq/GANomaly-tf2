@@ -476,12 +476,15 @@ class GANomaly(GANRunner):
             self.pred_fake, self.feat_fake = self.D(self.gen_img)
             g_loss = self.g_loss()
             #g_loss = 0.0
-            images = self.input.cpu().numpy()
-            fake_img = self.gen_img.cpu().numpy()
             
             images = self.renormalize(images)
-            fake_img = self.renormalize(fake_img)
+            fake_img = self.renormalize(self.gen_img)
             
+            images = images.cpu().numpy()
+            fake_img = fake_img.cpu().numpy()
+            #fake_img = self.gen_img
+            #print(fake_img.shape)
+            #print(images.shape)
             if show_img:
                 plt = self.plot_images(images,fake_img)
                 if data_type=='normal':
@@ -503,17 +506,13 @@ class GANomaly(GANRunner):
     def plot_images(self,images,outputs):
         # plot the first ten input images and then reconstructed images
         fig, axes = plt.subplots(nrows=2, ncols=15, sharex=True, sharey=True, figsize=(25,4))
-        
         # input images on top row, reconstructions on bottom
-        for images, row in zip([images, outputs], axes):
-            
-            for img, ax in zip(images, row):
+        for images2, row in zip([images,outputs], axes):     
+            for img, ax in zip(images2, row):
                 #img = img[:,:,::-1].transpose((2,1,0))
-                
-                ax.imshow(img)
+                ax.imshow(img[:,:])
                 ax.get_xaxis().set_visible(False)
                 ax.get_yaxis().set_visible(False)
-        
         return plt
     
     def plot_loss_distribution(self, SHOW_MAX_NUM,positive_loss,defeat_loss):

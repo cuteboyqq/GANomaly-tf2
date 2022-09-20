@@ -31,8 +31,10 @@ flags.DEFINE_float("w_con", 50., "Reconstruction loss weight")
 flags.DEFINE_float("w_enc", 1., "Encoder loss weight")
 flags.DEFINE_float("beta1", 0.5, "beta1 for Adam optimizer")
 flags.DEFINE_string("dataset", r'/home/ali/GitHub_Code/YOLO/YOLOV5/runs/detect/f_384_2min/crops_1cls', "name of dataset")
-flags.DEFINE_string("dataset_test", r'/home/ali/GitHub_Code/YOLO/YOLOV5/runs/detect/f_384_2min/crops_1cls', "name of dataset")
-flags.DEFINE_string("dataset_test_abnormal", r'/home/ali/GitHub_Code/YOLO/YOLOV5/runs/detect/f_384_2min/crops_noline', "name of dataset")
+#flags.DEFINE_string("dataset", 'cifar10', "name of dataset")
+flags.DEFINE_string("dataset_test", r'/home/ali/GitHub_Code/YOLO/YOLOV5/runs/detect/f_384_2min/crops_2cls', "name of dataset")
+flags.DEFINE_string("dataset_infer", r'/home/ali/GitHub_Code/YOLO/YOLOV5/runs/detect/f_384_2min/crops_1cls', "name of dataset")
+flags.DEFINE_string("dataset_infer_abnormal", r'/home/ali/GitHub_Code/YOLO/YOLOV5/runs/detect/f_384_2min/crops_noline', "name of dataset")
 DATASETS = ['mnist', 'cifar10']
 '''
 flags.register_validator('dataset',
@@ -52,7 +54,8 @@ def batch_resize(imgs, size: tuple):
 
 
 def main(_):
-    show_img = True
+    show_img = False
+    TRAIN = False
     opt = FLAGS
     # logging
     logging.set_verbosity(logging.INFO)
@@ -156,19 +159,34 @@ def main(_):
           seed=123,
           image_size=(img_height, img_width),
           batch_size=batch_size)
-        
-        if show_img==True:
+        if TRAIN == False:
+            if show_img==True:
+                batch_size_=opt.batch_size
+                shuffle=True
+            else:
+                batch_size_=1
+                shuffle=False
+        else:
             batch_size_=opt.batch_size
             shuffle=True
-        else:
-            batch_size_=1
-            shuffle=False
             
         val_data_dir = opt.dataset_test
         print(val_data_dir)
         print(batch_size_)
         test_dataset = tf.keras.utils.image_dataset_from_directory(
           val_data_dir,
+          validation_split=0.1,
+          subset="validation",
+          shuffle=shuffle,
+          seed=123,
+          image_size=(img_height, img_width),
+          batch_size=batch_size_)
+        
+        infer_data_dir = opt.dataset_infer
+        print(infer_data_dir)
+        print(batch_size_)
+        infer_dataset = tf.keras.utils.image_dataset_from_directory(
+          infer_data_dir,
           #validation_split=0.1,
           #subset="validation",
           shuffle=shuffle,
@@ -176,11 +194,11 @@ def main(_):
           image_size=(img_height, img_width),
           batch_size=batch_size_)
         
-        val_data_abnormal_dir = opt.dataset_test_abnormal
-        print(val_data_abnormal_dir)
+        infer_data_abnormal_dir = opt.dataset_infer_abnormal
+        print(infer_data_abnormal_dir)
         print(batch_size_)
-        test_dataset_abnormal = tf.keras.utils.image_dataset_from_directory(
-          val_data_abnormal_dir,
+        infer_dataset_abnormal = tf.keras.utils.image_dataset_from_directory(
+          infer_data_abnormal_dir,
           #validation_split=0.1,
           #subset="validation",
           shuffle=shuffle,
@@ -189,7 +207,7 @@ def main(_):
           batch_size=batch_size_)
     
     
-    TRAIN = False
+    
     ganomaly = GANomaly(opt,
                         train_dataset,
                         valid_dataset=None,
@@ -205,8 +223,8 @@ def main(_):
             SHOW_MAX_NUM = 5
         else:
             SHOW_MAX_NUM = 1500
-        positive_loss = ganomaly.infer(test_dataset,SHOW_MAX_NUM,show_img,'normal')
-        defeat_loss = ganomaly.infer(test_dataset_abnormal,SHOW_MAX_NUM,show_img,'abnormal')
+        positive_loss = ganomaly.infer(infer_dataset,SHOW_MAX_NUM,show_img,'normal')
+        defeat_loss = ganomaly.infer(infer_dataset_abnormal,SHOW_MAX_NUM,show_img,'abnormal')
         if not show_img:
             ganomaly.plot_loss_distribution( SHOW_MAX_NUM,positive_loss,defeat_loss)
     #print(loss_list)
