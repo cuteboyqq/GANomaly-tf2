@@ -7,6 +7,19 @@ Created on Sat Sep 24 15:55:29 2022
 
 import tensorflow as tf
 
+import tensorflow as tf
+from tensorflow import keras
+import numpy as np
+import random
+
+def representative_dataset():
+  for _ in range(100):
+      #data = random.randint(0, 1)
+      #yield [data]
+      data = np.random.rand(32)*2
+      yield [data.astype(np.float32)]
+
+
 def process(image,label):
     image = tf.cast(image/255. ,tf.float32)
     return image,label
