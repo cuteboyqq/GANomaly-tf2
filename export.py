@@ -51,28 +51,58 @@ import os
 os.makedirs('./export_model',exist_ok=True)
 
 quantize_mode = 'float32'
+export_tflite_model = False
+if export_tflite_model:
+    if quantize_mode == 'int8':
+        converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
+        converter.optimizations = [tf.lite.Optimize.DEFAULT]
+        converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS, tf.lite.OpsSet.SELECT_TF_OPS]
+        converter.allow_custom_ops = True
+        tflite_model = converter.convert()
+        # Save the model.
+        with open(r'./export_model/G-int8.tflite', 'wb') as f:
+          f.write(tflite_model)
+    elif quantize_mode == 'float16':
+        converter.optimizations = [tf.lite.Optimize.DEFAULT]
+        converter.target_spec.supported_types = [tf.compat.v1.lite.constants.FLOAT16]
+        converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS, tf.lite.OpsSet.SELECT_TF_OPS]
+        converter.allow_custom_ops = True
+        tflite_model = converter.convert()
+        with open(r'./export_model/G-float16.tflite', 'wb') as f:
+          f.write(tflite_model)
+    elif quantize_mode == 'float32':
+        tflite_model = converter.convert()
+        # Save the model.
+        with open(r'./export_model/G-float32.tflite', 'wb') as f:
+          f.write(tflite_model)
+    else:
+        print('[ERROR] No suuch quatization mode : {}'.format(quantize_mode))
+    
+    
+import platform
+import subprocess
+import warnings
+def export_edgetpu(file):
+    # YOLOv5 Edge TPU export https://coral.ai/docs/edgetpu/models-intro/
+    cmd = 'edgetpu_compiler --version'
+    help_url = 'https://coral.ai/docs/edgetpu/compiler/'
+    assert platform.system() == 'Linux', f'export only supported on Linux. See {help_url}'
+    if subprocess.run(f'{cmd} >/dev/null', shell=True).returncode != 0:
+        print(f'\n export requires Edge TPU compiler. Attempting install from {help_url}')
+        sudo = subprocess.run('sudo --version >/dev/null', shell=True).returncode == 0  # sudo installed on system
+        for c in (
+                'curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -',
+                'echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" | sudo tee /etc/apt/sources.list.d/coral-edgetpu.list',
+                'sudo apt-get update', 'sudo apt-get install edgetpu-compiler'):
+            subprocess.run(c if sudo else c.replace('sudo ', ''), shell=True, check=True)
+    ver = subprocess.run(cmd, shell=True, capture_output=True, check=True).stdout.decode().split()[-1]
 
-if quantize_mode == 'int8':
-    converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
-    converter.optimizations = [tf.lite.Optimize.DEFAULT]
-    converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS, tf.lite.OpsSet.SELECT_TF_OPS]
-    converter.allow_custom_ops = True
-    tflite_model = converter.convert()
-    # Save the model.
-    with open(r'./export_model/G-int8.tflite', 'wb') as f:
-      f.write(tflite_model)
-elif quantize_mode == 'float16':
-    converter.optimizations = [tf.lite.Optimize.DEFAULT]
-    converter.target_spec.supported_types = [tf.compat.v1.lite.constants.FLOAT16]
-    converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS, tf.lite.OpsSet.SELECT_TF_OPS]
-    converter.allow_custom_ops = True
-    tflite_model = converter.convert()
-    with open(r'./export_model/G-float16.tflite', 'wb') as f:
-      f.write(tflite_model)
-elif quantize_mode == 'float32':
-    tflite_model = converter.convert()
-    # Save the model.
-    with open(r'./export_model/G-float32.tflite', 'wb') as f:
-      f.write(tflite_model)
-else:
-    print('[ERROR] No suuch quatization mode : {}'.format(quantize_mode))
+    print(f'\n starting export with Edge TPU compiler {ver}...')
+    f = str(file).replace('.pt', '-int8_edgetpu.tflite')  # Edge TPU model
+    f_tfl = str(file).replace('.pt', '-int8.tflite')  # TFLite model
+
+    cmd = f"edgetpu_compiler -s -d -k 10 --out_dir {file.parent} {f_tfl}"
+    subprocess.run(cmd.split(), check=True)
+    return f, None
+
+export_edgetpu(r'C:\GitHub_Code\cuteboyqq\GANomaly\GANomaly-tf2\export_model\G-int8.tflie')
