@@ -78,7 +78,7 @@ if export_tflite_model:
     else:
         print('[ERROR] No suuch quatization mode : {}'.format(quantize_mode))
     
-    
+'''See official document at https://coral.ai/docs/edgetpu/compiler/#system-requirements'''
 import platform
 import subprocess
 import warnings
