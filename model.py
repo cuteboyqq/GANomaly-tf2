@@ -383,15 +383,20 @@ class GANRunner:
                 logging.info(log_str)
 
     def save(self, path):
-        self.G.save_weights(self.save_path + 'G')
-        self.D.save_weights(self.save_path + 'D')
+        #self.G.save_weights(self.save_path + 'G')
+        #self.D.save_weights(self.save_path + 'D')
+        #tf.saved_model.save(model, "saved_model_keras_dir")
+        self.G.save(self.save_path + 'G')
+        self.D.save(self.save_path + 'D')
 
     def load(self, path):
-        self.G.load_weights(self.save_path + 'G')
-        self.D.load_weights(self.save_path + 'D')
+        #self.G.load_weights(self.save_path + 'G')
+        #self.D.load_weights(self.save_path + 'D')
+        self.G = tf.keras.models.load_model(self.save_path + 'G')
+        self.D = tf.keras.models.load_model(self.save_path + 'D')
 
     def save_best(self):
-        self.save(self.save_path + 'best')
+        self.save(self.save_path + 'best') 
 
     def load_best(self):
         self.load(self.save_path + 'best')
