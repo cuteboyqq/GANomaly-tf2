@@ -79,6 +79,40 @@ if export_tflite_model:
         print('[ERROR] No suuch quatization mode : {}'.format(quantize_mode))
     
 '''See official document at https://coral.ai/docs/edgetpu/compiler/#system-requirements'''
+
+'''
+==================
+Edge TPU Compiler
+===================
+    The Edge TPU Compiler (edgetpu_compiler) is a command line tool that compiles a TensorFlow Lite model (.tflite file) 
+    into a file that's compatible with the Edge TPU. This page describes how to use the compiler and a bit about how it works.
+    
+    Before using the compiler, be sure you have a model that's compatible with the Edge TPU. For compatibility details, read
+    https://coral.ai/docs/edgetpu/models-intro/#compatibility-overview
+==========================
+System requirements
+==========================
+    The Edge TPU Compiler can be run on any modern Debian-based Linux system. Specifically, you must have the following:
+    
+    64-bit version of Debian 6.0 or higher, or any derivative thereof (such as Ubuntu 10.0+)
+    x86-64 system architecture
+If your system does not meet these requirements, try our web-based compiler using Google Colab.
+===============
+Download
+===============
+    You can install the compiler on your Linux system with the following commands:
+    curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
+    
+    echo "deb https://packages.cloud.google.com/apt coral-edgetpu-stable main" | sudo tee /etc/apt/sources.list.d/coral-edgetpu.list
+    
+    sudo apt-get update
+    
+    sudo apt-get install edgetpu-compiler
+========
+Usage
+=========
+    edgetpu_compiler [options] model...
+'''
 import platform
 import subprocess
 import warnings
