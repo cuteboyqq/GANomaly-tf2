@@ -168,6 +168,7 @@ def representative_dataset():
     for _ in range(100):
       data = np.random.rand(1, 32, 32, 3)
       yield [data.astype(np.float32)]
+      #yield [data.astype(np.int8)]
 
 '''code example is at https://www.tensorflow.org/lite/performance/post_training_quantization
         find the samw error issues https://github.com/google-coral/edgetpu/issues/453
@@ -243,7 +244,9 @@ def detect(w,tflite=False,edgetpu=True):
     if tflite or edgetpu:# https://www.tensorflow.org/lite/guide/python#install_tensorflow_lite_for_python
         try:  # https://coral.ai/docs/edgetpu/tflite-python/#update-existing-tf-lite-code-for-the-edge-tpu
             from tflite_runtime.interpreter import Interpreter, load_delegate
+            #print('try successful')
         except ImportError:
+            #print('ImportError')
             import tensorflow as tf
             Interpreter, load_delegate = tf.lite.Interpreter, tf.lite.experimental.load_delegate,
         if edgetpu:  # TF Edge TPU https://coral.ai/software/#edgetpu-runtime
@@ -266,8 +269,8 @@ def detect(w,tflite=False,edgetpu=True):
 if __name__=="__main__":
     saved_model_dir = r'/home/ali/GitHub_Code/cuteboyqq/GANomaly/GANomaly-tf2/ckpt/G'
     
-    INT8=False
-    EDGETPU=False
+    INT8=False #True
+    EDGETPU=False #True
     DETECT=True
     print('convert int8.tflite :{}\nconvert edgetpu.tflite:{}\ndetect:{}\n'.format(INT8,EDGETPU,DETECT))
     
