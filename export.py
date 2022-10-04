@@ -172,6 +172,7 @@ def representative_dataset():
       yield [data.astype(np.float32)]
 '''code example is at https://www.tensorflow.org/lite/performance/post_training_quantization
         find the samw error issues https://github.com/google-coral/edgetpu/issues/453
+        wrong data type error issues https://stackoverflow.com/questions/52530724/python-tensorflow-lite-error-cannot-set-tensor-got-tensor-of-type-1-but-expecte
     cthis code convert no error'''
 def export_tflite(saved_model_dir, int8=True):
     # YOLOv5 TensorFlow Lite export
@@ -210,7 +211,7 @@ def export_tflite(saved_model_dir, int8=True):
     # Get input and output tensors.
     input_details = interpreter.get_input_details()
     output_details = interpreter.get_output_details()
-    
+    print(interpreter.get_input_details())
     # Test the model on random input data.
     input_shape = input_details[0]['shape']
     input_data = np.array(np.random.random_sample(input_shape), dtype=np.int8)
