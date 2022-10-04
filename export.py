@@ -55,44 +55,42 @@ infer_dataset = tf.keras.utils.image_dataset_from_directory(
 infer_dataset = infer_dataset.map(process)
 
 
-saved_model_dir = r'/home/ali/GitHub_Code/cuteboyqq/GANomaly/GANomaly-tf2/ckpt/G'
-
-# Convert the model
-converter = tf.lite.TFLiteConverter.from_saved_model(saved_model_dir) # path to the SavedModel directory
-
 import os
 os.makedirs('./export_model',exist_ok=True)
 
-quantize_mode = 'int8'
-export_tflite_model = False
-if export_tflite_model:
-    if quantize_mode == 'int8':
-        print('Start convert to int8 tflite model')
-        converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
-        converter.optimizations = [tf.lite.Optimize.DEFAULT]
-        converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS, tf.lite.OpsSet.SELECT_TF_OPS]
-        converter.allow_custom_ops = True
-        tflite_model = converter.convert()
-        # Save the model.
-        with open(r'./export_model/G-int8.tflite', 'wb') as f:
-          f.write(tflite_model)
-    elif quantize_mode == 'float16':
-        print('Start convert to float16 tflite model')
-        converter.optimizations = [tf.lite.Optimize.DEFAULT]
-        converter.target_spec.supported_types = [tf.compat.v1.lite.constants.FLOAT16]
-        converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS, tf.lite.OpsSet.SELECT_TF_OPS]
-        converter.allow_custom_ops = True
-        tflite_model = converter.convert()
-        with open(r'./export_model/G-float16.tflite', 'wb') as f:
-          f.write(tflite_model)
-    elif quantize_mode == 'float32':
-        print('Start convert to float32 tflite model')
-        tflite_model = converter.convert()
-        # Save the model.
-        with open(r'./export_model/G-float32.tflite', 'wb') as f:
-          f.write(tflite_model)
-    else:
-        print('[ERROR] No suuch quatization mode : {}'.format(quantize_mode))
+def convert_tflite_oldversion(saved_model_dir):
+    # Convert the model
+    converter = tf.lite.TFLiteConverter.from_saved_model(saved_model_dir) # path to the SavedModel directory
+    quantize_mode = 'int8'
+    export_tflite_model = False
+    if export_tflite_model:
+        if quantize_mode == 'int8':
+            print('Start convert to int8 tflite model')
+            converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
+            converter.optimizations = [tf.lite.Optimize.DEFAULT]
+            converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS, tf.lite.OpsSet.SELECT_TF_OPS]
+            converter.allow_custom_ops = True
+            tflite_model = converter.convert()
+            # Save the model.
+            with open(r'./export_model/G-int8.tflite', 'wb') as f:
+              f.write(tflite_model)
+        elif quantize_mode == 'float16':
+            print('Start convert to float16 tflite model')
+            converter.optimizations = [tf.lite.Optimize.DEFAULT]
+            converter.target_spec.supported_types = [tf.compat.v1.lite.constants.FLOAT16]
+            converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS, tf.lite.OpsSet.SELECT_TF_OPS]
+            converter.allow_custom_ops = True
+            tflite_model = converter.convert()
+            with open(r'./export_model/G-float16.tflite', 'wb') as f:
+              f.write(tflite_model)
+        elif quantize_mode == 'float32':
+            print('Start convert to float32 tflite model')
+            tflite_model = converter.convert()
+            # Save the model.
+            with open(r'./export_model/G-float32.tflite', 'wb') as f:
+              f.write(tflite_model)
+        else:
+            print('[ERROR] No suuch quatization mode : {}'.format(quantize_mode))
     
 '''See official document at https://coral.ai/docs/edgetpu/compiler/#system-requirements'''
 
@@ -170,6 +168,7 @@ def representative_dataset():
     for _ in range(100):
       data = np.random.rand(1, 32, 32, 3)
       yield [data.astype(np.float32)]
+
 '''code example is at https://www.tensorflow.org/lite/performance/post_training_quantization
         find the samw error issues https://github.com/google-coral/edgetpu/issues/453
         wrong data type error issues https://stackoverflow.com/questions/52530724/python-tensorflow-lite-error-cannot-set-tensor-got-tensor-of-type-1-but-expecte
@@ -186,7 +185,7 @@ def export_tflite(saved_model_dir, int8=True):
     #converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS]
     #converter.target_spec.supported_types = [tf.float16] 
     converter.optimizations = [tf.lite.Optimize.DEFAULT]
-    converter.representative_dataset = representative_dataset()
+    converter.representative_dataset = representative_dataset
     if int8:
         converter.experimental_new_converter = False
         converter.optimizations = [tf.lite.Optimize.DEFAULT]
@@ -194,6 +193,13 @@ def export_tflite(saved_model_dir, int8=True):
         converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
         converter.inference_input_type = tf.int8  # or tf.uint8 successul
         converter.inference_output_type = tf.int8  # or tf.uint8 successful
+    else: # uint8
+        converter.experimental_new_converter = False
+        converter.optimizations = [tf.lite.Optimize.DEFAULT]
+        converter.representative_dataset = representative_dataset
+        converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
+        converter.inference_input_type = tf.uint8  # or tf.uint8 successul
+        converter.inference_output_type = tf.uint8  # or tf.uint8 successful
     #if nms or agnostic_nms:
         #converter.target_spec.supported_ops.append(tf.lite.OpsSet.SELECT_TF_OPS)
 
@@ -211,10 +217,16 @@ def export_tflite(saved_model_dir, int8=True):
     # Get input and output tensors.
     input_details = interpreter.get_input_details()
     output_details = interpreter.get_output_details()
+    print('interpreter.get_input_details()')
     print(interpreter.get_input_details())
+    print('interpreter.get_output_details()')
+    print(interpreter.get_output_details())
     # Test the model on random input data.
     input_shape = input_details[0]['shape']
-    input_data = np.array(np.random.random_sample(input_shape), dtype=np.int8)
+    if int8:
+        input_data = np.array(np.random.random_sample(input_shape), dtype=np.int8)
+    else:
+        input_data = np.array(np.random.random_sample(input_shape), dtype=np.uint8)
     interpreter.set_tensor(input_details[0]['index'], input_data)
     
     interpreter.invoke()
@@ -226,15 +238,46 @@ def export_tflite(saved_model_dir, int8=True):
         
     return f, None
 
-INT8=False
-if INT8:
+
+def detect(w,tflite=False,edgetpu=True):
+    if tflite or edgetpu:# https://www.tensorflow.org/lite/guide/python#install_tensorflow_lite_for_python
+        try:  # https://coral.ai/docs/edgetpu/tflite-python/#update-existing-tf-lite-code-for-the-edge-tpu
+            from tflite_runtime.interpreter import Interpreter, load_delegate
+        except ImportError:
+            import tensorflow as tf
+            Interpreter, load_delegate = tf.lite.Interpreter, tf.lite.experimental.load_delegate,
+        if edgetpu:  # TF Edge TPU https://coral.ai/software/#edgetpu-runtime
+            print(f'Loading {w} for TensorFlow Lite Edge TPU inference...')
+            delegate = {
+                'Linux': 'libedgetpu.so.1',
+                'Darwin': 'libedgetpu.1.dylib',
+                'Windows': 'edgetpu.dll'}[platform.system()]
+            interpreter = Interpreter(model_path=w, experimental_delegates=[load_delegate(delegate)])
+        else:  # TFLite
+            print(f'Loading {w} for TensorFlow Lite inference...')
+            interpreter = Interpreter(model_path=w)  # load TFLite model
+        interpreter.allocate_tensors()  # allocate
+        input_details = interpreter.get_input_details()  # inputs
+        output_details = interpreter.get_output_details()  # outputs 
+        print('input details : \n{}'.format(input_details))
+        print('output details : \n{}'.format(output_details))
+
+
+if __name__=="__main__":
     saved_model_dir = r'/home/ali/GitHub_Code/cuteboyqq/GANomaly/GANomaly-tf2/ckpt/G'
-    export_tflite(saved_model_dir, int8=True)
     
-EDGETPU=True
-if EDGETPU:
-    f = export_edgetpu(r'/home/ali/GitHub_Code/cuteboyqq/GANomaly/GANomaly-tf2/export_model/G-int8-new.tflite')
+    INT8=False
+    EDGETPU=False
+    DETECT=True
+    print('convert int8.tflite :{}\nconvert edgetpu.tflite:{}\ndetect:{}\n'.format(INT8,EDGETPU,DETECT))
     
-
-
-
+    if INT8:
+        saved_model_dir = r'/home/ali/GitHub_Code/cuteboyqq/GANomaly/GANomaly-tf2/ckpt/G'
+        export_tflite(saved_model_dir, int8=True)
+    
+    if EDGETPU:
+        f = export_edgetpu(r'/home/ali/GitHub_Code/cuteboyqq/GANomaly/GANomaly-tf2/export_model/G-int8-new.tflite')
+        
+    if DETECT:
+        w=r'/home/ali/GitHub_Code/cuteboyqq/GANomaly/GANomaly-tf2/export_model/G-uint8-new_edgetpu.tflite'
+        detect(w)
