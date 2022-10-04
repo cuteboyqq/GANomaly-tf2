@@ -162,9 +162,7 @@ def export_edgetpu(file):
     subprocess.run(cmd.split(), check=True)
     return f, None
 
-EDGETPU=True
-if EDGETPU:
-    f = export_edgetpu(r'/home/ali/GitHub_Code/cuteboyqq/GANomaly/GANomaly-tf2/export_model/G-uint8-new.tflite')
+
 
 
 
@@ -193,13 +191,13 @@ def export_tflite(saved_model_dir, int8=True):
         converter.optimizations = [tf.lite.Optimize.DEFAULT]
         converter.representative_dataset = representative_dataset
         converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
-        converter.inference_input_type = tf.uint8  # or tf.uint8
-        converter.inference_output_type = tf.uint8  # or tf.uint8
+        converter.inference_input_type = tf.int8  # or tf.uint8 successul
+        converter.inference_output_type = tf.int8  # or tf.uint8 successful
     #if nms or agnostic_nms:
         #converter.target_spec.supported_ops.append(tf.lite.OpsSet.SELECT_TF_OPS)
 
     tflite_quant_model = converter.convert()
-    f='./export_model/G-uint8-new.tflite'
+    f='./export_model/G-int8-new.tflite'
     open(f, "wb").write(tflite_quant_model)
     
     import numpy as np
@@ -215,7 +213,7 @@ def export_tflite(saved_model_dir, int8=True):
     
     # Test the model on random input data.
     input_shape = input_details[0]['shape']
-    input_data = np.array(np.random.random_sample(input_shape), dtype=np.uint8)
+    input_data = np.array(np.random.random_sample(input_shape), dtype=np.int8)
     interpreter.set_tensor(input_details[0]['index'], input_data)
     
     interpreter.invoke()
@@ -231,6 +229,10 @@ INT8=False
 if INT8:
     saved_model_dir = r'/home/ali/GitHub_Code/cuteboyqq/GANomaly/GANomaly-tf2/ckpt/G'
     export_tflite(saved_model_dir, int8=True)
+    
+EDGETPU=True
+if EDGETPU:
+    f = export_edgetpu(r'/home/ali/GitHub_Code/cuteboyqq/GANomaly/GANomaly-tf2/export_model/G-int8-new.tflite')
     
 
 
