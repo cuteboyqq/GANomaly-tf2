@@ -160,20 +160,40 @@ def export_edgetpu(file):
     subprocess.run(cmd.split(), check=True)
     return f, None
 
-
-
+import glob
+def rep_data_gen():
+    root = "/home/ali/GitHub_Code/YOLO/YOLOV5/runs/detect/f_384_2min/crops_2cls_cyclegan"
+    BATCH_SIZE = 16
+    a = []
+    for i in range(160):
+        #inst = anns[i]
+        #file_name = inst['filename']
+        file_name = sorted(glob.glob(os.path.join(root, "B") + "/*.*"))
+        img = cv2.imread(file_name[i])
+        img = cv2.resize(img, (32, 32))
+        img = img / 255.0
+        img = img.astype(np.float32)
+        a.append(img)
+    a = np.array(a)
+    print(a.shape) # a is np array of 160 3D images
+    img = tf.data.Dataset.from_tensor_slices(a).batch(1)
+    for i in img.take(BATCH_SIZE):
+        print(i)
+        yield [i]
 
 
 def representative_dataset():
     for _ in range(100):
       data = np.random.rand(1, 32, 32, 3)
       yield [data.astype(np.float32)]
-      #yield [data.astype(np.int8)]
+      #yield [data.astype(np.uint8)]
 
 '''code example is at https://www.tensorflow.org/lite/performance/post_training_quantization
         find the samw error issues https://github.com/google-coral/edgetpu/issues/453
         wrong data type error issues https://stackoverflow.com/questions/52530724/python-tensorflow-lite-error-cannot-set-tensor-got-tensor-of-type-1-but-expecte
-    cthis code convert no error'''
+    cthis code convert no error
+    https://stackoverflow.com/questions/57877959/what-is-the-correct-way-to-create-representative-dataset-for-tfliteconverter
+    '''
 def export_tflite(saved_model_dir, int8=True):
     # YOLOv5 TensorFlow Lite export
     import tensorflow as tf
@@ -190,14 +210,16 @@ def export_tflite(saved_model_dir, int8=True):
     if int8:
         converter.experimental_new_converter = False
         converter.optimizations = [tf.lite.Optimize.DEFAULT]
-        converter.representative_dataset = representative_dataset
+        #converter.representative_dataset = representative_dataset
+        converter.representative_dataset = rep_data_gen
         converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
         converter.inference_input_type = tf.int8  # or tf.uint8 successul
         converter.inference_output_type = tf.int8  # or tf.uint8 successful
     else: # uint8
         converter.experimental_new_converter = False
         converter.optimizations = [tf.lite.Optimize.DEFAULT]
-        converter.representative_dataset = representative_dataset
+        #converter.representative_dataset = representative_dataset
+        converter.representative_dataset = rep_data_gen
         converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS_INT8]
         converter.inference_input_type = tf.uint8  # or tf.uint8 successul
         converter.inference_output_type = tf.uint8  # or tf.uint8 successful
@@ -269,14 +291,14 @@ def detect(w,tflite=False,edgetpu=True):
 if __name__=="__main__":
     saved_model_dir = r'/home/ali/GitHub_Code/cuteboyqq/GANomaly/GANomaly-tf2/ckpt/G'
     
-    INT8=False #True
-    EDGETPU=False #True
-    DETECT=True
+    INT8=True #True
+    EDGETPU=True #True
+    DETECT=False
     print('convert int8.tflite :{}\nconvert edgetpu.tflite:{}\ndetect:{}\n'.format(INT8,EDGETPU,DETECT))
     
     if INT8:
         saved_model_dir = r'/home/ali/GitHub_Code/cuteboyqq/GANomaly/GANomaly-tf2/ckpt/G'
-        export_tflite(saved_model_dir, int8=True)
+        export_tflite(saved_model_dir, int8=False)
     
     if EDGETPU:
         f = export_edgetpu(r'/home/ali/GitHub_Code/cuteboyqq/GANomaly/GANomaly-tf2/export_model/G-int8-new.tflite')
