@@ -37,7 +37,7 @@ def process(image,label):
     image = tf.cast(image/255. ,tf.float32)
     return image,label
 
-infer_data_dir = r'/home/ali/GitHub_Code/YOLO/YOLOV5/runs/detect/f_384_2min/crops_1cls'
+infer_data_dir = r'/home/ali/GitHub_Code/YOLO/YOLOV5-old/runs/detect/f_384_2min/crops_1cls'
 shuffle = False
 img_height = 64
 img_width = 64
@@ -149,7 +149,7 @@ def export_edgetpu(file):
 
     print(f'\n starting export with Edge TPU compiler {ver}...')
     #f = str(file).replace('.pt', '-int8_edgetpu.tflite')  # Edge TPU model
-    f = str(file).replace('.tflite', '-int8_edgetpu.tflite')  # Edge TPU model
+    f = str(file).replace('.tflite', '-uint8_edgetpu.tflite')  # Edge TPU model
     #f_tfl = str(file).replace('-int8.tflite', '-int8.tflite')  # TFLite model
     f_tfl = str(file)
     #f_tfl = str(file).replace('.pt', '-int8.tflite')  # TFLite model
@@ -162,8 +162,8 @@ def export_edgetpu(file):
 
 import glob
 def rep_data_gen():
-    root = "/home/ali/GitHub_Code/YOLO/YOLOV5/runs/detect/f_384_2min/crops_2cls_cyclegan"
-    BATCH_SIZE = 16
+    root = "/home/ali/GitHub_Code/YOLO/YOLOV5-old/runs/detect/f_384_2min/crops_2cls_cyclegan"
+    BATCH_SIZE = 1
     a = []
     for i in range(160):
         #inst = anns[i]
@@ -171,8 +171,13 @@ def rep_data_gen():
         file_name = sorted(glob.glob(os.path.join(root, "B") + "/*.*"))
         img = cv2.imread(file_name[i])
         img = cv2.resize(img, (32, 32))
-        img = img / 255.0
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        #image_data = utils.image_preprocess(np.copy(original_image), [input_size, input_size])
+        #img = img[np.newaxis, ...].astype(np.float32)
+        #print("calibration image {}".format(img[i]))
+        #img = img / 255.0
         img = img.astype(np.float32)
+        #yield [img]
         a.append(img)
     a = np.array(a)
     print(a.shape) # a is np array of 160 3D images
@@ -227,7 +232,11 @@ def export_tflite(saved_model_dir, int8=True):
         #converter.target_spec.supported_ops.append(tf.lite.OpsSet.SELECT_TF_OPS)
 
     tflite_quant_model = converter.convert()
-    f='./export_model/G-int8-new.tflite'
+    f=''
+    if int8:
+        f='./export_model/G-int8-new.tflite'
+    else:
+        f='./export_model/G-uint8-new.tflite'
     open(f, "wb").write(tflite_quant_model)
     
     import numpy as np
@@ -288,21 +297,106 @@ def detect(w,tflite=False,edgetpu=True):
         print('output details : \n{}'.format(output_details))
 
 
+def detect_image(w, im, tflite=False,edgetpu=True):
+    if tflite or edgetpu:# https://www.tensorflow.org/lite/guide/python#install_tensorflow_lite_for_python
+        try:  # https://coral.ai/docs/edgetpu/tflite-python/#update-existing-tf-lite-code-for-the-edge-tpu
+            from tflite_runtime.interpreter import Interpreter, load_delegate
+            #print('try successful')
+        except ImportError:
+            #print('ImportError')
+            import tensorflow as tf
+            Interpreter, load_delegate = tf.lite.Interpreter, tf.lite.experimental.load_delegate,
+        if edgetpu:  # TF Edge TPU https://coral.ai/software/#edgetpu-runtime
+            print(f'Loading {w} for TensorFlow Lite Edge TPU inference...')
+            delegate = {
+                'Linux': 'libedgetpu.so.1',
+                'Darwin': 'libedgetpu.1.dylib',
+                'Windows': 'edgetpu.dll'}[platform.system()]
+            interpreter = Interpreter(model_path=w, experimental_delegates=[load_delegate(delegate)])
+        else:  # TFLite
+            print(f'Loading {w} for TensorFlow Lite inference...')
+            interpreter = Interpreter(model_path=w)  # load TFLite model
+        interpreter.allocate_tensors()  # allocate
+        input_details = interpreter.get_input_details()  # inputs
+        output_details = interpreter.get_output_details()  # outputs 
+        print('input details : \n{}'.format(input_details))
+        print('output details : \n{}'.format(output_details))
+        
+        import tensorflow as tf
+        from PIL import Image
+        # Lite or Edge TPU
+        im = cv2.imread(im)
+        im = cv2.resize(im, (32, 32))
+        #im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
+        #im = im/255.0
+        im = (im).astype('int32')
+        #image_data = utils.image_preprocess(np.copy(original_image), [input_size, input_size])
+        #img = img[np.newaxis, ...].astype(np.float32)
+        #print("calibration image {}".format(img[i]))
+        #img = img / 255.0
+        
+        #im = Image.fromarray((im * 255).astype('uint8'))
+        im = tf.expand_dims(im, axis=0)
+        im = im.cpu().numpy()
+        #print('im:{}'.format(im.shape))
+        #print('im: {}'.format(im))
+        input = input_details[0]
+        int8 = input['dtype'] == np.uint8  # is TFLite quantized uint8 model (np.uint8)
+        print('input[dtype] : {}'.format(input['dtype']))
+        if int8:
+            print('is TFLite quantized uint8 model')
+            scale, zero_point = input['quantization']
+            im = (im * scale + zero_point).astype(np.uint8)  # de-scale
+        interpreter.set_tensor(input['index'], im)
+        interpreter.invoke()
+        y = []
+        for output in output_details:
+            x = interpreter.get_tensor(output['index'])
+            print(x.shape)
+            print(x)
+            if x.shape[1]==32:
+                print('get out images')
+                
+                scale, zero_point = output['quantization']
+                
+                x = (x.astype(np.float32) - zero_point) * scale  # re-scale
+                x = tf.squeeze(x)
+                x = x.numpy()
+                
+                cv2.imshow('out_image',x)
+                cv2.imwrite('out_image.jpg',x)
+                cv2.waitKey(100)
+            if int8:
+                scale, zero_point = output['quantization']
+                x = (x.astype(np.float32) - zero_point) * scale  # re-scale
+                
+            y.append(x)
+        y = [x if isinstance(x, np.ndarray) else x.numpy() for x in y]
+        #print(y)
+        return y
+
 if __name__=="__main__":
     saved_model_dir = r'/home/ali/GitHub_Code/cuteboyqq/GANomaly/GANomaly-tf2/ckpt/G'
     
-    INT8=True #True
-    EDGETPU=True #True
+    INT8=False #True
+    EDGETPU=False #True
     DETECT=False
-    print('convert int8.tflite :{}\nconvert edgetpu.tflite:{}\ndetect:{}\n'.format(INT8,EDGETPU,DETECT))
+    DETECT_IMAGE=True
+    print('convert int8.tflite :{}\nconvert edgetpu.tflite:{}\ndetect:{}\ndetect_image:{}'.format(INT8,EDGETPU,DETECT,DETECT_IMAGE))
     
     if INT8:
         saved_model_dir = r'/home/ali/GitHub_Code/cuteboyqq/GANomaly/GANomaly-tf2/ckpt/G'
         export_tflite(saved_model_dir, int8=False)
     
     if EDGETPU:
-        f = export_edgetpu(r'/home/ali/GitHub_Code/cuteboyqq/GANomaly/GANomaly-tf2/export_model/G-int8-new.tflite')
+        f = export_edgetpu(r'/home/ali/GitHub_Code/cuteboyqq/GANomaly/GANomaly-tf2/export_model/G-uint8-new.tflite')
         
     if DETECT:
         w=r'/home/ali/GitHub_Code/cuteboyqq/GANomaly/GANomaly-tf2/export_model/G-uint8-new_edgetpu.tflite'
-        detect(w)
+        #w=r'/home/ali/GitHub_Code/cuteboyqq/GANomaly/GANomaly-tf2/export_model/G-uint8-new.tflite'
+        detect(w,tflite=False,edgetpu=True)
+    if DETECT_IMAGE:
+        im = r'/home/ali/GitHub_Code/YOLO/YOLOV5-old/runs/detect/f_384_2min/crops_1cls/line/ori_video_ver246.jpg'
+        #w=r'/home/ali/GitHub_Code/cuteboyqq/GANomaly/GANomaly-tf2/export_model/G-uint8-new_edgetpu.tflite'
+        w=r'/home/ali/GitHub_Code/cuteboyqq/GANomaly/GANomaly-tf2/export_model/G-uint8-new.tflite'
+        y = detect_image(w, im, tflite=True,edgetpu=False)
