@@ -297,6 +297,29 @@ def detect(w,tflite=False,edgetpu=True):
         print('output details : \n{}'.format(output_details))
 
 
+def g_loss(input_img, gen_img, latent_i, latent_o):
+    # loss
+    l2_loss = tf.keras.losses.MeanSquaredError()
+    l1_loss = tf.keras.losses.MeanAbsoluteError()
+    #bce_loss = tf.keras.losses.BinaryCrossentropy()
+    
+    # adversarial loss (use feature matching)
+    #l_adv = l2_loss
+    # contextual loss
+    l_con = l1_loss
+    # Encoder loss
+    l_enc = l2_loss
+    # discriminator loss
+    #l_bce = bce_loss
+    
+    #err_g_adv = l_adv(feat_real, feat_fake)
+    err_g_con = l_con(input_img, gen_img)
+    #err_g_enc = l_enc(latent_i, latent_o)
+    err_g_enc = 0
+    g_loss = err_g_con * 50 + \
+             err_g_enc * 1
+    return g_loss
+
 def detect_image(w, im, tflite=False,edgetpu=True):
     if tflite or edgetpu:# https://www.tensorflow.org/lite/guide/python#install_tensorflow_lite_for_python
         try:  # https://coral.ai/docs/edgetpu/tflite-python/#update-existing-tf-lite-code-for-the-edge-tpu
@@ -327,6 +350,9 @@ def detect_image(w, im, tflite=False,edgetpu=True):
         # Lite or Edge TPU
         im = cv2.imread(im)
         im = cv2.resize(im, (32, 32))
+        cv2.imshow('ori_image',im)
+        cv2.imwrite('ori_image.jpg',im)
+        cv2.waitKey(100)
         #im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
         #im = im/255.0
         im = (im).astype('int32')
@@ -338,10 +364,12 @@ def detect_image(w, im, tflite=False,edgetpu=True):
         #im = Image.fromarray((im * 255).astype('uint8'))
         im = tf.expand_dims(im, axis=0)
         im = im.cpu().numpy()
+        input_img = im
         #print('im:{}'.format(im.shape))
         #print('im: {}'.format(im))
         input = input_details[0]
         int8 = input['dtype'] == np.uint8  # is TFLite quantized uint8 model (np.uint8)
+        #int32 = input['dtype'] == np.int32  # is TFLite quantized uint8 model (np.uint8)
         print('input[dtype] : {}'.format(input['dtype']))
         if int8:
             print('is TFLite quantized uint8 model')
@@ -368,10 +396,16 @@ def detect_image(w, im, tflite=False,edgetpu=True):
                 cv2.waitKey(100)
             if int8:
                 scale, zero_point = output['quantization']
-                x = (x.astype(np.float32) - zero_point) * scale  # re-scale
+                gen_img = (x.astype(np.float32) - zero_point) * scale  # re-scale
+                
                 
             y.append(x)
         y = [x if isinstance(x, np.ndarray) else x.numpy() for x in y]
+        gen_img = y[0]
+        latent_i = y[1]
+        latent_o = y[2]
+        _g_loss = g_loss(input_img, gen_img, latent_i, latent_o)
+        print('g_loss : {}'.format(_g_loss))
         #print(y)
         return y
 
