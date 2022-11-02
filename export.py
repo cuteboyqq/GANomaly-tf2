@@ -426,7 +426,7 @@ def detect_image(w, im, tflite=False,edgetpu=True):
         latent_i = y[1]
         latent_o = y[2]
         _g_loss = g_loss(input_img, gen_img, latent_i, latent_o)
-        print('g_loss : {}'.format(_g_loss))
+        #print('g_loss : {}'.format(_g_loss))
         #print(y)
         return _g_loss, gen_img
     
@@ -496,6 +496,27 @@ def renormalize(tensor):
     maxTo = 1
     return minTo + (maxTo - minTo) * ((tensor - minFrom) / (maxFrom - minFrom))
 
+def plot_loss_distribution(SHOW_MAX_NUM,positive_loss,defeat_loss):
+    # Importing packages
+    import matplotlib.pyplot as plt2
+    # Define data values
+    x = [i for i in range(SHOW_MAX_NUM)]
+    y = positive_loss
+    z = defeat_loss
+    print(x)
+    print(positive_loss)
+    print(defeat_loss)
+    # Plot a simple line chart
+    #plt2.plot(x, y)
+    # Plot another line on the same chart/graph
+    #plt2.plot(x, z)
+    plt2.scatter(x,y,s=1)
+    plt2.scatter(x,z,s=1) 
+    os.makedirs('./runs/detect',exist_ok=True)
+    file_path = os.path.join('./runs/detect/tflite_model','loss_distribution.jpg')
+    plt2.savefig(file_path)
+    plt2.show()
+
 if __name__=="__main__":
     saved_model_dir = r'/home/ali/GitHub_Code/cuteboyqq/GANomaly/GANomaly-tf2/ckpt/G'
     
@@ -558,7 +579,7 @@ if __name__=="__main__":
         
         w=r'/home/ali/GitHub_Code/cuteboyqq/GANomaly/GANomaly-tf2/export_model/G-uint8-new.tflite'
         
-        SHOW_MAX_NUM = 200
+        SHOW_MAX_NUM = 150
         
         show_img = False
         
@@ -569,6 +590,6 @@ if __name__=="__main__":
         
         noline_loss = infer(test_dataset_abnormal, w, SHOW_MAX_NUM, show_img, noline_data_type)
         
-        
+        plot_loss_distribution(SHOW_MAX_NUM,line_loss,noline_loss)
         
         
