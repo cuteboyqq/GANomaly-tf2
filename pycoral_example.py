@@ -54,7 +54,7 @@ import warnings
 from pathlib import Path
 import cv2
 import numpy as np
-def detect(w,tflite=False,edgetpu=True):
+def get_interpreter(w,tflite=False,edgetpu=True):
     if tflite or edgetpu:# https://www.tensorflow.org/lite/guide/python#install_tensorflow_lite_for_python
         try:  # https://coral.ai/docs/edgetpu/tflite-python/#update-existing-tf-lite-code-for-the-edge-tpu
             from tflite_runtime.interpreter import Interpreter, load_delegate
@@ -88,12 +88,13 @@ def detect(w,tflite=False,edgetpu=True):
         print('output details : \n{}'.format(output_details))
     return interpreter
 
-def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True):
+def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True, save_image=True):
+    SHOW_LOG=False
     INFER=False
     ONLY_DETECT_ONE_IMAGE=True
     if interpreter is None:
         print('interpreter is None, get interpreter now')
-        interpreter = detect(w,tflite,edgetpu)
+        interpreter = get_interpreter(w,tflite,edgetpu)
         interpreter.allocate_tensors()  # allocate
         input_details = interpreter.get_input_details()  # inputs
         output_details = interpreter.get_output_details()  # outputs 
@@ -150,11 +151,11 @@ def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True):
     elif ONLY_DETECT_ONE_IMAGE:
         im = cv2.imread(im)
         im = cv2.resize(im, (64, 64))
-        
         #input_img = im
+        if save_image:
         #cv2.imshow('ori_image',im)
-        #cv2.imwrite('ori_image.jpg',im)
-        #cv2.waitKey(10)
+            cv2.imwrite('./runs/detect/ori_image.jpg',im)
+            cv2.waitKey(10)
         
     #im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
     #im = im/255.0
@@ -166,7 +167,8 @@ def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True):
     
     #im = Image.fromarray((im * 255).astype('uint8'))
     im = im[np.newaxis, ...].astype(np.float32)
-    print('im : {}'.format(im.shape))
+    if SHOW_LOG:
+        print('im : {}'.format(im.shape))
     input_img = im
     im = im/255.0
     #im = tf.expand_dims(im, axis=0)
@@ -183,7 +185,8 @@ def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True):
         scale, zero_point = input['quantization']
         im = (im / scale + zero_point).astype(np.uint8)  # de-scale
         #im = im.astype(np.uint8)
-        print('after de-scale {}'.format(im))
+        if SHOW_LOG:
+            print('after de-scale {}'.format(im))
     interpreter.set_tensor(input['index'], im)
     interpreter.invoke()
     y = []
@@ -205,9 +208,10 @@ def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True):
             
             gen_img = np.squeeze(gen_img)
             #print('after squeeze & numpy x : {}'.format(x))
-            cv2.imshow('out_image',gen_img)
-            cv2.imwrite('out_image.jpg',gen_img)
-            cv2.waitKey(10)
+            if save_image:
+                #cv2.imshow('out_image',gen_img)
+                cv2.imwrite('./runs/detect/out_image.jpg',gen_img)
+                cv2.waitKey(10)
             #gen_img = renormalize(gen_img)
             #gen_img = tf.transpose(gen_img, perm=[0,1,2])
             #plt.imshow(gen_img)
@@ -221,15 +225,21 @@ def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True):
         y.append(x)
     y = [x if isinstance(x, np.ndarray) else x.numpy() for x in y]
     #gen_img = y[0]
-    print('input image : {}'.format(input_img))
-    print('input image : {}'.format(input_img.shape))
-    print('gen_img : {}'.format(gen_img))
-    print('gen_img : {}'.format(gen_img.shape))
-    latent_i = y[0]
-    latent_o = y[1]
-    _g_loss = g_loss(input_img, gen_img, latent_i, latent_o)
+    
+    if SHOW_LOG:
+        print('input image : {}'.format(input_img))
+        print('input image : {}'.format(input_img.shape))
+        print('gen_img : {}'.format(gen_img))
+        print('gen_img : {}'.format(gen_img.shape))
+    latent_i = y[1]
+    latent_o = y[2]
+    if SHOW_LOG:
+        print('latent_i : {}'.format(latent_i))
+        print('latent_o : {}'.format(latent_o))
+    _g_loss = g_loss(input_img/255.0, gen_img/255.0, latent_i, latent_o)
     #_g_loss = 888
-    print('g_loss : {}'.format(_g_loss))
+    if SHOW_LOG:
+        print('g_loss : {}'.format(_g_loss))
     #print(y)
     return _g_loss, gen_img
 
@@ -238,7 +248,7 @@ def g_loss(input_img, gen_img, latent_i, latent_o):
     def l1_loss(A,B):
         return np.mean((abs(A-B)).flatten())
     def l2_loss(A,B):
-        return np.mean(sqrt((A-B)*(A-B)).flatten())
+        return np.mean(np.sqrt((A-B)*(A-B)).flatten())
     # tf loss
     #l2_loss = tf.keras.losses.MeanSquaredError()
     #l1_loss = tf.keras.losses. MeanAbsoluteError()
@@ -256,15 +266,120 @@ def g_loss(input_img, gen_img, latent_i, latent_o):
     #err_g_adv = l_adv(feat_real, feat_fake)
     err_g_con = l_con(input_img, gen_img)
     #err_g_enc = l_enc(latent_i, latent_o)
-    err_g_enc = 0
+    err_g_enc = l_enc(latent_i,latent_o)
     g_loss = err_g_con * 50 + \
              err_g_enc * 1
     return g_loss
 
+
+def infer(test_dataset, w, SHOW_MAX_NUM, show_img, data_type, tflite, edgetpu):
+    interpreter = detect(w,tflite,edgetpu)
+    show_num = 0
+    
+    loss_list = []
+    dataiter = iter(test_dataset)
+    #for step, (images, y_batch_train) in enumerate(test_dataset):
+    cnt=1
+    os.makedirs('./runs/detect/tflite_model',exist_ok=True)
+    while(show_num < SHOW_MAX_NUM):
+        images, labels = dataiter.next()
+        #latent_i, fake_img, latent_o = self.G(images)
+        #self.input = images
+        
+        #self.latent_i, self.gen_img, self.latent_o = self.G(self.input)
+        #self.pred_real, self.feat_real = self.D(self.input)
+        #self.pred_fake, self.feat_fake = self.D(self.gen_img)
+        #g_loss = self.g_loss()
+        
+        g_loss,fake_img = detect_image(w, images, interpreter, tflite=True,edgetpu=False, save_image=True)
+        
+        
+        #g_loss = 0.0
+        #print("input")
+        #print(self.input)
+        #print("gen_img")
+        #print(self.gen_img)
+        #images = renormalize(images)
+        #fake_img = renormalize(fake_img)
+        #fake_img = self.gen_img
+        #images = images.cpu().numpy()
+        #fake_img = fake_img.cpu().numpy()
+        #fake_img = self.gen_img
+        #print(fake_img.shape)
+        #print(images.shape)
+        if show_img:
+            #plt = self.plot_images(images,fake_img)
+            if data_type=='normal':
+                file_name = 'infer_normal' + str(cnt) + '.jpg'
+            else:
+                file_name = 'infer_abnormal' + str(cnt) + '.jpg'
+            #file_path = os.path.join('./runs/detect',file_name)
+            #plt.savefig(file_path)
+            cnt+=1
+        if data_type=='normal':
+            print('{} normal: {}'.format(show_num,g_loss.numpy()))
+        else:
+            print('{} abnormal: {}'.format(show_num,g_loss.numpy()))
+        loss_list.append(g_loss.numpy())
+        show_num+=1
+        #if show_num%20==0:
+            #print(show_num)
+    return loss_list
+
+def process(image,label):
+    image = tf.cast(image/255. ,tf.float32)
+    return image,label
+
+def renormalize(tensor):
+    minFrom= tf.math.reduce_min(tensor)
+    maxFrom= tf.math.reduce_max(tensor)
+    minTo = 0
+    maxTo = 1
+    return minTo + (maxTo - minTo) * ((tensor - minFrom) / (maxFrom - minFrom))
+
+def plot_loss_distribution(SHOW_MAX_NUM,positive_loss,defeat_loss):
+    # Importing packages
+    import matplotlib.pyplot as plt2
+    # Define data values
+    x = [i for i in range(SHOW_MAX_NUM)]
+    y = positive_loss
+    z = defeat_loss
+    print(x)
+    print(positive_loss)
+    print(defeat_loss)
+    # Plot a simple line chart
+    #plt2.plot(x, y)
+    # Plot another line on the same chart/graph
+    #plt2.plot(x, z)
+    plt2.scatter(x,y,s=1)
+    plt2.scatter(x,z,s=1) 
+    os.makedirs('./runs/detect',exist_ok=True)
+    file_path = os.path.join('./runs/detect','loss_distribution_300.jpg')
+    plt2.savefig(file_path)
+    plt2.show()
+
+def infer_python(img_dir,interpreter,SHOW_MAX_NUM):
+    import glob
+    image_list = glob.glob(os.path.join(img_dir,'*.jpg'))
+    loss_list = []
+    cnt = 0
+    for image_path in image_list:
+        print(image_path)
+        cnt+=1
+        
+        if cnt<=SHOW_MAX_NUM:
+            loss,gen_img = detect_image(w, image_path, interpreter=interpreter, tflite=False,edgetpu=True, save_image=False)
+            print('{} loss: {}'.format(cnt,loss))
+            loss_list.append(loss)
+    
+    
+    return loss_list
+
 if __name__=="__main__":
     PYCORAL = False
     DETECT = False
-    DETECT_IMAGE = True
+    DETECT_IMAGE = False
+    INFER = True
     if DETECT:
         w=r'/home/ali/Desktop/GANomaly-tf2/export_model/G-uint8-20221104_edgetpu.tflite'
         #w=r'/home/ali/GitHub_Code/cuteboyqq/GANomaly/GANomaly-tf2/export_model/G-uint8-new.tflite'
@@ -273,11 +388,66 @@ if __name__=="__main__":
         Pycoral_Edgetpu()
         
     if DETECT_IMAGE:
-        
+        save_image = True
         im = r'/home/ali/Desktop/factory_data/crops_1cls/line/ori_video_ver2121.jpg'
         #im = r'/home/ali/Desktop/factory_data/crops_2cls_small/noline/ori_video_ver244.jpg'
-        
         #w=r'/home/ali/GitHub_Code/cuteboyqq/GANomaly/GANomaly-tf2/export_model/G-uint8-new_edgetpu.tflite'
         #w=r'/home/ali/Desktop/GANomaly-tf2/export_model/G-uint8-20221104.tflite'
+        w = r'/home/ali/Desktop/GANomaly-tf2/export_model/G-uint8-20221104_edgetpu.tflite'
+        loss, gen_image = detect_image(w, im, tflite=False,edgetpu=True, save_image=True)
+        
+        
+    if INFER:
+        #import tensorflow as tf
+        test_data_dir = r'/home/ali/Desktop/factory_data/crops_2cls_small/line'
+        abnormal_test_data_dir = r'/home/ali/Desktop/factory_data/crops_2cls_small/noline'
+        (img_height, img_width) = (64,64)
+        batch_size_ = 1
+        shuffle = False
+        SHOW_MAX_NUM = 300
+        w = r'/home/ali/Desktop/GANomaly-tf2/export_model/G-uint8-20221104_edgetpu.tflite'
+        interpreter = get_interpreter(w,tflite=False,edgetpu=True)
+        line_loss = infer_python(test_data_dir,interpreter,SHOW_MAX_NUM)
+        noline_loss = infer_python(abnormal_test_data_dir,interpreter,SHOW_MAX_NUM)
+        plot_loss_distribution(SHOW_MAX_NUM,line_loss,noline_loss)
+        #for loss in loss_list:
+            #print(loss)
+        '''
+        test_dataset = tf.keras.utils.image_dataset_from_directory(
+          test_data_dir,
+          #validation_split=0.1,
+          #subset="validation",
+          shuffle=shuffle,
+          seed=123,
+          image_size=(img_height, img_width),
+          batch_size=batch_size_)
+        
+        test_dataset = test_dataset.map(process)
+        
+        
+        test_dataset_abnormal = tf.keras.utils.image_dataset_from_directory(
+          abnormal_test_data_dir,
+          #validation_split=0.1,
+          #subset="validation",
+          shuffle=shuffle,
+          seed=123,
+          image_size=(img_height, img_width),
+          batch_size=batch_size_)
+        
+        test_dataset_abnormal = test_dataset_abnormal.map(process)
+        
         w=r'/home/ali/Desktop/GANomaly-tf2/export_model/G-uint8-20221104_edgetpu.tflite'
-        loss, gen_image = detect_image(w, im, tflite=False,edgetpu=True)
+        
+        SHOW_MAX_NUM = 1800
+        
+        show_img = False
+        
+        line_data_type = 'normal'
+        noline_data_type = 'abnormal'
+        
+        line_loss = infer(test_dataset, w, SHOW_MAX_NUM, show_img, line_data_type,tflite=False,edgetpu=True)
+        
+        noline_loss = infer(test_dataset_abnormal, w, SHOW_MAX_NUM, show_img, noline_data_type,tflite=False,edgetpu=True)
+        
+        plot_loss_distribution(SHOW_MAX_NUM,line_loss,noline_loss)
+        '''
