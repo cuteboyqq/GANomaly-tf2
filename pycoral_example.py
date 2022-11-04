@@ -88,7 +88,7 @@ def get_interpreter(w,tflite=False,edgetpu=True):
         print('output details : \n{}'.format(output_details))
     return interpreter
 
-def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True, save_image=True):
+def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True, save_image=True, cnt=1):
     SHOW_LOG=False
     INFER=False
     ONLY_DETECT_ONE_IMAGE=True
@@ -140,8 +140,8 @@ def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True, save_image=
     from PIL import Image
     from matplotlib import pyplot as plt
     # Lite or Edge TPU
-
-    
+    os.makedirs('./runs/detect/ori_images',exist_ok=True)
+    os.makedirs('./runs/detect/gen_images',exist_ok=True)
     if INFER:
         input_img = im
         #im = tf.transpose(im, perm=[0,1,2,3])
@@ -154,8 +154,10 @@ def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True, save_image=
         #input_img = im
         if save_image:
         #cv2.imshow('ori_image',im)
-            cv2.imwrite('./runs/detect/ori_image.jpg',im)
-            cv2.waitKey(10)
+            filename = 'ori_image_' + str(cnt) + '.jpg'
+            file_path = os.path.join('./runs/detect/ori_images', filename)
+            cv2.imwrite(file_path,im)
+            #cv2.waitKey(10)
         
     #im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
     #im = im/255.0
@@ -210,8 +212,10 @@ def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True, save_image=
             #print('after squeeze & numpy x : {}'.format(x))
             if save_image:
                 #cv2.imshow('out_image',gen_img)
-                cv2.imwrite('./runs/detect/out_image.jpg',gen_img)
-                cv2.waitKey(10)
+                filename = 'out_image_' + str(cnt) + '.jpg'
+                file_path = os.path.join('./runs/detect/gen_images/',filename)
+                cv2.imwrite(file_path,gen_img)
+                #cv2.waitKey(10)
             #gen_img = renormalize(gen_img)
             #gen_img = tf.transpose(gen_img, perm=[0,1,2])
             #plt.imshow(gen_img)
@@ -291,7 +295,7 @@ def infer(test_dataset, w, SHOW_MAX_NUM, show_img, data_type, tflite, edgetpu):
         #self.pred_fake, self.feat_fake = self.D(self.gen_img)
         #g_loss = self.g_loss()
         
-        g_loss,fake_img = detect_image(w, images, interpreter, tflite=True,edgetpu=False, save_image=True)
+        g_loss,fake_img = detect_image(w, images, interpreter, tflite=True,edgetpu=False, save_image=True, cnt=1)
         
         
         #g_loss = 0.0
@@ -356,11 +360,11 @@ def plot_loss_distribution(SHOW_MAX_NUM,positive_loss,defeat_loss):
     plt2.scatter(x,y,s=1)
     plt2.scatter(x,z,s=1) 
     os.makedirs('./runs/detect',exist_ok=True)
-    file_path = os.path.join('./runs/detect','loss_distribution_1550.jpg')
+    file_path = os.path.join('./runs/detect','loss_distribution_100.jpg')
     plt2.savefig(file_path)
     plt2.show()
 
-def infer_python(img_dir,interpreter,SHOW_MAX_NUM):
+def infer_python(img_dir,interpreter,SHOW_MAX_NUM,save_image=False):
     import glob
     image_list = glob.glob(os.path.join(img_dir,'*.jpg'))
     loss_list = []
@@ -370,7 +374,7 @@ def infer_python(img_dir,interpreter,SHOW_MAX_NUM):
         cnt+=1
         
         if cnt<=SHOW_MAX_NUM:
-            loss,gen_img = detect_image(w, image_path, interpreter=interpreter, tflite=False,edgetpu=True, save_image=False)
+            loss,gen_img = detect_image(w, image_path, interpreter=interpreter, tflite=False,edgetpu=True, save_image=save_image, cnt=cnt)
             print('{} loss: {}'.format(cnt,loss))
             loss_list.append(loss)
     
@@ -406,12 +410,13 @@ if __name__=="__main__":
         (img_height, img_width) = (64,64)
         batch_size_ = 1
         shuffle = False
-        SHOW_MAX_NUM = 1550
+        SHOW_MAX_NUM = 10
+        save_image=True
         w = r'/home/ali/Desktop/GANomaly-tf2/export_model/G-uint8-20221104_edgetpu.tflite'
         interpreter = get_interpreter(w,tflite=False,edgetpu=True)
-        line_loss = infer_python(test_data_dir,interpreter,SHOW_MAX_NUM)
-        noline_loss = infer_python(abnormal_test_data_dir,interpreter,SHOW_MAX_NUM)
-        plot_loss_distribution(SHOW_MAX_NUM,line_loss,noline_loss)
+        line_loss = infer_python(test_data_dir,interpreter,SHOW_MAX_NUM,save_image=save_image)
+        #noline_loss = infer_python(abnormal_test_data_dir,interpreter,SHOW_MAX_NUM)
+        #plot_loss_distribution(SHOW_MAX_NUM,line_loss,noline_loss)
         #=================================================
         #if plt have QT error try
         #pip uninstall opencv-python
