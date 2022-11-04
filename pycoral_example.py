@@ -345,8 +345,10 @@ def plot_loss_distribution(SHOW_MAX_NUM,positive_loss,defeat_loss):
     y = positive_loss
     z = defeat_loss
     print(x)
-    print(positive_loss)
-    print(defeat_loss)
+    print('positive_loss len: {}'.format(len(positive_loss)))
+    print('defeat_loss len: {}'.format(len(defeat_loss)))
+    #print(positive_loss)
+    #print(defeat_loss)
     # Plot a simple line chart
     #plt2.plot(x, y)
     # Plot another line on the same chart/graph
@@ -354,7 +356,7 @@ def plot_loss_distribution(SHOW_MAX_NUM,positive_loss,defeat_loss):
     plt2.scatter(x,y,s=1)
     plt2.scatter(x,z,s=1) 
     os.makedirs('./runs/detect',exist_ok=True)
-    file_path = os.path.join('./runs/detect','loss_distribution_300.jpg')
+    file_path = os.path.join('./runs/detect','loss_distribution_1550.jpg')
     plt2.savefig(file_path)
     plt2.show()
 
@@ -404,12 +406,17 @@ if __name__=="__main__":
         (img_height, img_width) = (64,64)
         batch_size_ = 1
         shuffle = False
-        SHOW_MAX_NUM = 300
+        SHOW_MAX_NUM = 1550
         w = r'/home/ali/Desktop/GANomaly-tf2/export_model/G-uint8-20221104_edgetpu.tflite'
         interpreter = get_interpreter(w,tflite=False,edgetpu=True)
         line_loss = infer_python(test_data_dir,interpreter,SHOW_MAX_NUM)
         noline_loss = infer_python(abnormal_test_data_dir,interpreter,SHOW_MAX_NUM)
         plot_loss_distribution(SHOW_MAX_NUM,line_loss,noline_loss)
+        #=================================================
+        #if plt have QT error try
+        #pip uninstall opencv-python
+        #pip install opencv-python-headless
+        #=================================================
         #for loss in loss_list:
             #print(loss)
         '''
