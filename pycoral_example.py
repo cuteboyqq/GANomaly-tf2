@@ -8,10 +8,12 @@ Created on Thu Nov  3 11:46:08 2022
 
 import os
 import pathlib
+'''
 from pycoral.utils import edgetpu
 from pycoral.utils import dataset
 from pycoral.adapters import common
 from pycoral.adapters import classify
+'''
 from PIL import Image
 
 def Pycoral_Edgetpu():
@@ -364,6 +366,20 @@ def plot_loss_distribution(SHOW_MAX_NUM,positive_loss,defeat_loss):
     plt2.savefig(file_path)
     plt2.show()
 
+#https://stackoverflow.com/questions/6871201/plot-two-histograms-on-single-chart-with-matplotlib
+def plot_two_loss_histogram(normal_list, abnormal_list, name):
+    import numpy
+    from matplotlib import pyplot
+    bins = numpy.linspace(0, 8, 100)
+    pyplot.hist(normal_list, bins, alpha=0.5, label='normal')
+    pyplot.hist(abnormal_list, bins, alpha=0.5, label='abnormal')
+    pyplot.legend(loc='upper right')
+    os.makedirs('./runs/detect',exist_ok=True)
+    filename = str(name) + '.jpg'
+    file_path = os.path.join('./runs/detect',filename)
+    pyplot.savefig(file_path)
+    pyplot.show()
+
 def infer_python(img_dir,interpreter,SHOW_MAX_NUM,save_image=False):
     import glob
     image_list = glob.glob(os.path.join(img_dir,'*.jpg'))
@@ -374,7 +390,7 @@ def infer_python(img_dir,interpreter,SHOW_MAX_NUM,save_image=False):
         cnt+=1
         
         if cnt<=SHOW_MAX_NUM:
-            loss,gen_img = detect_image(w, image_path, interpreter=interpreter, tflite=False,edgetpu=True, save_image=save_image, cnt=cnt)
+            loss,gen_img = detect_image(w, image_path, interpreter=interpreter, tflite=True,edgetpu=False, save_image=save_image, cnt=cnt)
             print('{} loss: {}'.format(cnt,loss))
             loss_list.append(loss)
     
@@ -389,7 +405,7 @@ if __name__=="__main__":
     if DETECT:
         w=r'/home/ali/Desktop/GANomaly-tf2/export_model/G-uint8-20221104_edgetpu.tflite'
         #w=r'/home/ali/GitHub_Code/cuteboyqq/GANomaly/GANomaly-tf2/export_model/G-uint8-new.tflite'
-        detect(w,tflite=False,edgetpu=True)
+        get_interpreter(w,tflite=False,edgetpu=True)
     if PYCORAL:
         Pycoral_Edgetpu()
         
@@ -405,18 +421,20 @@ if __name__=="__main__":
         
     if INFER:
         #import tensorflow as tf
-        test_data_dir = r'/home/ali/Desktop/factory_data/crops_2cls_small/line'
-        abnormal_test_data_dir = r'/home/ali/Desktop/factory_data/crops_2cls_small/noline'
+        test_data_dir = r'/home/ali/GitHub_Code/YOLO/YOLOV5/runs/detect/factory_data/crops_line/line'
+        abnormal_test_data_dir = r'/home/ali/GitHub_Code/YOLO/YOLOV5/runs/detect/factory_data/crops_noline/noline'
         (img_height, img_width) = (64,64)
         batch_size_ = 1
         shuffle = False
-        SHOW_MAX_NUM = 10
+        SHOW_MAX_NUM = 500
         save_image=True
-        w = r'/home/ali/Desktop/GANomaly-tf2/export_model/G-uint8-20221104_edgetpu.tflite'
-        interpreter = get_interpreter(w,tflite=False,edgetpu=True)
+        w = r'/home/ali/GitHub_Code/cuteboyqq/GANomaly/GANomaly-tf2/export_model/G-uint8-20221109.tflite'
+        interpreter = get_interpreter(w,tflite=True,edgetpu=False)
         line_loss = infer_python(test_data_dir,interpreter,SHOW_MAX_NUM,save_image=save_image)
-        #noline_loss = infer_python(abnormal_test_data_dir,interpreter,SHOW_MAX_NUM)
-        #plot_loss_distribution(SHOW_MAX_NUM,line_loss,noline_loss)
+        
+        noline_loss = infer_python(abnormal_test_data_dir,interpreter,SHOW_MAX_NUM)
+        plot_loss_distribution(SHOW_MAX_NUM,line_loss,noline_loss)
+        plot_two_loss_histogram(line_loss,noline_loss,'line_noline')
         #=================================================
         #if plt have QT error try
         #pip uninstall opencv-python
