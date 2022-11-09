@@ -15,7 +15,7 @@ FLAGS = flags.FLAGS
 flags.DEFINE_integer("shuffle_buffer_size", 10000,
                      "buffer size for pseudo shuffle")
 flags.DEFINE_integer("batch_size", 64, "batch_size")
-flags.DEFINE_integer("isize", 32, "input size")
+flags.DEFINE_integer("isize", 64, "input size")
 flags.DEFINE_string("ckpt_dir", 'ckpt', "checkpoint folder")
 flags.DEFINE_integer("nz", 100, "latent dims")
 flags.DEFINE_integer("nc", 3, "input channels")
@@ -24,17 +24,17 @@ flags.DEFINE_integer("ngf", 64, "number of generator's filters")
 flags.DEFINE_integer("extralayers", 0, "extralayers for both G and D")
 flags.DEFINE_list("encdims", None, "Layer dimensions of the encoder and in reverse of the decoder."
                                    "If given, dense encoder and decoders are used.")
-flags.DEFINE_integer("niter",50,"number of training epochs")
+flags.DEFINE_integer("niter",100,"number of training epochs")
 flags.DEFINE_float("lr", 2e-4, "learning rate")
 flags.DEFINE_float("w_adv", 1., "Adversarial loss weight")
 flags.DEFINE_float("w_con", 50., "Reconstruction loss weight")
 flags.DEFINE_float("w_enc", 1., "Encoder loss weight")
 flags.DEFINE_float("beta1", 0.5, "beta1 for Adam optimizer")
-flags.DEFINE_string("dataset", r'/home/ali/GitHub_Code/YOLO/YOLOV5/runs/detect/f_384_2min/crops_1cls', "name of dataset")
+flags.DEFINE_string("dataset", r'/home/ali/GitHub_Code/YOLO/YOLOV5/runs/detect/factory_data/crops_line', "name of dataset")
 #flags.DEFINE_string("dataset", 'cifar10', "name of dataset")
-flags.DEFINE_string("dataset_test", r'/home/ali/GitHub_Code/YOLO/YOLOV5/runs/detect/f_384_2min/crops_2cls', "name of dataset")
-flags.DEFINE_string("dataset_infer", r'/home/ali/GitHub_Code/YOLO/YOLOV5/runs/detect/f_384_2min/crops_1cls', "name of dataset")
-flags.DEFINE_string("dataset_infer_abnormal", r'/home/ali/GitHub_Code/YOLO/YOLOV5/runs/detect/f_384_2min/crops_noline', "name of dataset")
+flags.DEFINE_string("dataset_test", r'/home/ali/GitHub_Code/YOLO/YOLOV5/runs/detect/factory_data/crops_2cls', "name of dataset")
+flags.DEFINE_string("dataset_infer", r'/home/ali/GitHub_Code/YOLO/YOLOV5/runs/detect/factory_data/crops_line', "name of dataset")
+flags.DEFINE_string("dataset_infer_abnormal", r'/home/ali/GitHub_Code/YOLO/YOLOV5/runs/detect/factory_data/crops_noline', "name of dataset")
 DATASETS = ['mnist', 'cifar10']
 '''
 flags.register_validator('dataset',
@@ -57,6 +57,8 @@ def process(image,label):
     return image,label
 
 def main(_):
+    show_loss_histogram = True
+    show_loss_distribution = True
     show_img = False
     TRAIN = False
     opt = FLAGS
@@ -232,11 +234,15 @@ def main(_):
         if show_img:
             SHOW_MAX_NUM = 5
         else:
-            SHOW_MAX_NUM = 1900
+            SHOW_MAX_NUM = 1800
         positive_loss = ganomaly.infer(infer_dataset,SHOW_MAX_NUM,show_img,'normal')
         defeat_loss = ganomaly.infer(infer_dataset_abnormal,SHOW_MAX_NUM,show_img,'abnormal')
-        if not show_img:
+        if show_loss_distribution:
             ganomaly.plot_loss_distribution( SHOW_MAX_NUM,positive_loss,defeat_loss)
+        if show_loss_histogram:
+            ganomaly.plot_loss_histogram(positive_loss,'plositvie')
+            ganomaly.plot_loss_histogram(defeat_loss,'negative')
+            ganomaly.plot_two_loss_histogram(positive_loss,defeat_loss,'normal_abnormal_histogram0')
     #print(loss_list)
     #print(loss_abnormal_list)
 if __name__ == '__main__':

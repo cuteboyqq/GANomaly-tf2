@@ -461,6 +461,22 @@ class GANomaly(GANRunner):
         maxTo = 1
         return minTo + (maxTo - minTo) * ((tensor - minFrom) / (maxFrom - minFrom))
     
+    
+    def infer_cropimage(self,image):
+        abnormal = 0
+        self.input = image
+        self.latent_i, self.gen_img, self.latent_o = self.G(self.input)
+        self.pred_real, self.feat_real = self.D(self.input)
+        self.pred_fake, self.feat_fake = self.D(self.gen_img)
+        g_loss = self.g_loss()
+        if g_loss>1.0:
+            abnormal=1
+            print('abnoraml')
+        else:
+            abnormal=0
+            print('normal')
+        return abnormal
+        
     def infer(self, test_dataset,SHOW_MAX_NUM,show_img,data_type):
         show_num = 0
         self.load_best()
@@ -545,8 +561,32 @@ class GANomaly(GANRunner):
         plt2.savefig(file_path)
         plt2.show()
         
+    def plot_loss_histogram(self,loss_list, name):
+        from matplotlib import pyplot
+        import numpy
+        bins = numpy.linspace(0, 3, 100)
+        pyplot.hist(loss_list, bins=bins, alpha=0.5, label=name)
+        os.makedirs('./runs/detect',exist_ok=True)
+        filename = str(name) + '.jpg'
+        file_path = os.path.join('./runs/detect',filename)
+        plt.savefig(file_path)
+        plt.show()
     
-    
+    #https://stackoverflow.com/questions/6871201/plot-two-histograms-on-single-chart-with-matplotlib
+    def plot_two_loss_histogram(self,normal_list, abnormal_list, name):
+        import numpy
+        from matplotlib import pyplot
+        bins = numpy.linspace(0, 3, 100)
+        pyplot.hist(normal_list, bins, alpha=0.5, label='normal')
+        pyplot.hist(abnormal_list, bins, alpha=0.5, label='abnormal')
+        pyplot.legend(loc='upper right')
+        os.makedirs('./runs/detect',exist_ok=True)
+        filename = str(name) + '.jpg'
+        file_path = os.path.join('./runs/detect',filename)
+        plt.savefig(file_path)
+        pyplot.show()
+        
+        
     def _evaluate(self, test_dataset):
         an_scores = []
         gt_labels = []
