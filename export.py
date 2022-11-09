@@ -173,20 +173,23 @@ def export_edgetpu(file):
 
 import glob
 def rep_data_gen():
-    root = "/home/ali/GitHub_Code/YOLO/YOLOV5-old/runs/detect/f_384_2min/crops_2cls_cyclegan"
+    root = "/home/ali/GitHub_Code/YOLO/YOLOV5/runs/detect/factory_data/crops_line"
     BATCH_SIZE = 1
     a = []
-    for i in range(160):
+    for i in range(1000):
         #inst = anns[i]
         #file_name = inst['filename']
-        file_name = sorted(glob.glob(os.path.join(root, "B") + "/*.*"))
+        file_name = sorted(glob.glob(os.path.join(root, "line") + "/*.*"))
         img = cv2.imread(file_name[i])
         img = cv2.resize(img, (64, 64))
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         #image_data = utils.image_preprocess(np.copy(original_image), [input_size, input_size])
         #img = img[np.newaxis, ...].astype(np.float32)
         #print("calibration image {}".format(img[i]))
-        #img = img / 255.0
+        #=============================
+        #2022-11-04 add normalization
+        #=============================
+        img = img / 255.0
         img = img.astype(np.float32)
         #yield [img]
         a.append(img)
@@ -209,6 +212,8 @@ def representative_dataset():
         wrong data type error issues https://stackoverflow.com/questions/52530724/python-tensorflow-lite-error-cannot-set-tensor-got-tensor-of-type-1-but-expecte
     cthis code convert no error
     https://stackoverflow.com/questions/57877959/what-is-the-correct-way-to-create-representative-dataset-for-tfliteconverter
+    
+    quintize infomation : https://zhuanlan.zhihu.com/p/79744430
     '''
 def export_tflite(saved_model_dir, int8=True):
     # YOLOv5 TensorFlow Lite export
@@ -222,7 +227,7 @@ def export_tflite(saved_model_dir, int8=True):
     #converter.target_spec.supported_ops = [tf.lite.OpsSet.TFLITE_BUILTINS]
     #converter.target_spec.supported_types = [tf.float16] 
     converter.optimizations = [tf.lite.Optimize.DEFAULT]
-    converter.representative_dataset = representative_dataset
+    converter.representative_dataset = rep_data_gen
     if int8:
         converter.experimental_new_converter = False
         converter.optimizations = [tf.lite.Optimize.DEFAULT]
@@ -245,9 +250,9 @@ def export_tflite(saved_model_dir, int8=True):
     tflite_quant_model = converter.convert()
     f=''
     if int8:
-        f='./export_model/G-int8-20221104.tflite'
+        f='./export_model/G-int8-64nz32-20221109.tflite'
     else:
-        f='./export_model/G-uint8-20221104.tflite'
+        f='./export_model/G-uint8-64nz32-20221109.tflite'
     open(f, "wb").write(tflite_quant_model)
     
     import numpy as np
@@ -336,6 +341,7 @@ def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True):
     INFER=True
     ONLY_DETECT_ONE_IMAGE=False
     if interpreter is None:
+        print('interpreter is None, get interpreter now')
         interpreter = detect(w,tflite,edgetpu)
         interpreter.allocate_tensors()  # allocate
         input_details = interpreter.get_input_details()  # inputs
@@ -392,10 +398,11 @@ def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True):
         #plt.show()
     elif ONLY_DETECT_ONE_IMAGE:
         im = cv2.imread(im)
-        im = cv2.resize(im, (64, 64))
+        im = cv2.resize(im, (128, 128))
         #cv2.imshow('ori_image',im)
         #cv2.imwrite('ori_image.jpg',im)
         #cv2.waitKey(10)
+        
     #im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
     #im = im/255.0
     #im = (im).astype('int32')
@@ -406,7 +413,7 @@ def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True):
     
     #im = Image.fromarray((im * 255).astype('uint8'))
     im = tf.expand_dims(im, axis=0)
-    im = im.cpu().numpy()
+    im = im.numpy()
     
     #print('im:{}'.format(im.shape))
     #print('im: {}'.format(im))
@@ -490,11 +497,11 @@ def infer(test_dataset, w, SHOW_MAX_NUM, show_img, data_type, tflite, edgetpu):
         #print(self.input)
         #print("gen_img")
         #print(self.gen_img)
-        images = renormalize(images)
-        fake_img = renormalize(fake_img)
+        #images = renormalize(images)
+        #fake_img = renormalize(fake_img)
         #fake_img = self.gen_img
-        images = images.cpu().numpy()
-        fake_img = fake_img.cpu().numpy()
+        #images = images.cpu().numpy()
+        #fake_img = fake_img.cpu().numpy()
         #fake_img = self.gen_img
         #print(fake_img.shape)
         #print(images.shape)
@@ -553,11 +560,11 @@ def plot_loss_distribution(SHOW_MAX_NUM,positive_loss,defeat_loss):
 if __name__=="__main__":
     saved_model_dir = r'/home/ali/GitHub_Code/cuteboyqq/GANomaly/GANomaly-tf2/ckpt/G'
     
-    INT8=False #True
-    EDGETPU=False #True
+    INT8=True #True
+    EDGETPU=True #True
     DETECT=False
     DETECT_IMAGE=False
-    INFER = True
+    INFER = False
     print('convert int8.tflite :{}\nconvert edgetpu.tflite:{}\ndetect:{}\ndetect_image:{}\ninfer:{}'.format(INT8,EDGETPU,DETECT,DETECT_IMAGE,INFER))
     
     if INT8:
@@ -565,7 +572,7 @@ if __name__=="__main__":
         export_tflite(saved_model_dir, int8=False)
     
     if EDGETPU:
-        f = export_edgetpu(r'/home/ali/GitHub_Code/cuteboyqq/GANomaly/GANomaly-tf2/export_model/G-uint8-20221104.tflite')
+        f = export_edgetpu(r'/home/ali/GitHub_Code/cuteboyqq/GANomaly/GANomaly-tf2/export_model/G-uint8-64nz32-20221109.tflite')
         
     if DETECT:
         w=r'/home/ali/GitHub_Code/cuteboyqq/GANomaly/GANomaly-tf2/export_model/G-uint8-new_edgetpu.tflite'
@@ -581,8 +588,8 @@ if __name__=="__main__":
         
         
     if INFER:
-        test_data_dir = r'/home/ali/GitHub_Code/YOLO/YOLOV5-old/runs/detect/f_384_2min/crops'
-        abnormal_test_data_dir = r'/home/ali/GitHub_Code/YOLO/YOLOV5-old/runs/detect/f_384_2min/defeat_nowall'
+        test_data_dir = r'/home/ali/GitHub_Code/YOLO/YOLOV5/runs/detect/factory_data/crops_line'
+        abnormal_test_data_dir = r'/home/ali/GitHub_Code/YOLO/YOLOV5/runs/detect/factory_data/crops_noline'
         (img_height, img_width) = (64,64)
         batch_size_ = 1
         shuffle = False
