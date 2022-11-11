@@ -8,12 +8,10 @@ Created on Thu Nov  3 11:46:08 2022
 
 import os
 import pathlib
-'''
 from pycoral.utils import edgetpu
 from pycoral.utils import dataset
 from pycoral.adapters import common
 from pycoral.adapters import classify
-'''
 from PIL import Image
 
 def Pycoral_Edgetpu():
@@ -90,7 +88,7 @@ def get_interpreter(w,tflite=False,edgetpu=True):
         print('output details : \n{}'.format(output_details))
     return interpreter
 
-def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True, save_image=True, cnt=1):
+def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True, save_image=True, cnt=1, name='normal'):
     SHOW_LOG=False
     INFER=False
     ONLY_DETECT_ONE_IMAGE=True
@@ -104,46 +102,15 @@ def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True, save_image=
         #print('output details : \n{}'.format(output_details))
     input_details = interpreter.get_input_details()  # inputs
     output_details = interpreter.get_output_details()  # outputs 
-    '''
-    if tflite or edgetpu:# https://www.tensorflow.org/lite/guide/python#install_tensorflow_lite_for_python
-        try:  # https://coral.ai/docs/edgetpu/tflite-python/#update-existing-tf-lite-code-for-the-edge-tpu
-            from tflite_runtime.interpreter import Interpreter, load_delegate
-            #print('try successful')
-        except ImportError:
-            #print('ImportError')
-            import tensorflow as tf
-            Interpreter, load_delegate = tf.lite.Interpreter, tf.lite.experimental.load_delegate,
-        if edgetpu:  # TF Edge TPU https://coral.ai/software/#edgetpu-runtime
-            #print(f'Loading {w} for TensorFlow Lite Edge TPU inference...')
-            
-            #delegate = {
-                #'Linux': 'libedgetpu.so.1',
-                #'Darwin': 'libedgetpu.1.dylib',
-                #'Windows': 'edgetpu.dll'}[platform.system()]
-            
-            #interpreter = Interpreter(model_path=w, experimental_delegates=[load_delegate(delegate)])
-            
-            # Initialize the TF interpreter
-            print('Start interpreter')
-            interpreter = edgetpu.make_interpreter(w)
-            print('End interpreter')
-            
-            
-        else:  # TFLite
-            #print(f'Loading {w} for TensorFlow Lite inference...')
-            interpreter = Interpreter(model_path=w)  # load TFLite model
-        interpreter.allocate_tensors()  # allocate
-        input_details = interpreter.get_input_details()  # inputs
-        output_details = interpreter.get_output_details()  # outputs 
-        print('input details : \n{}'.format(input_details))
-        print('output details : \n{}'.format(output_details))
-       ''' 
+  
     #import tensorflow as tf
     from PIL import Image
     from matplotlib import pyplot as plt
     # Lite or Edge TPU
-    os.makedirs('./runs/detect/ori_images',exist_ok=True)
-    os.makedirs('./runs/detect/gen_images',exist_ok=True)
+    save_ori_image_dir = os.path.join('./runs/detect',name,'ori_images')
+    save_gen_image_dir = os.path.join('./runs/detect',name,'gen_images')
+    os.makedirs(save_ori_image_dir,exist_ok=True)
+    os.makedirs(save_gen_image_dir,exist_ok=True)
     if INFER:
         input_img = im
         #im = tf.transpose(im, perm=[0,1,2,3])
@@ -157,38 +124,35 @@ def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True, save_image=
         if save_image:
         #cv2.imshow('ori_image',im)
             filename = 'ori_image_' + str(cnt) + '.jpg'
-            file_path = os.path.join('./runs/detect/ori_images', filename)
+            file_path = os.path.join(save_ori_image_dir, filename)
             cv2.imwrite(file_path,im)
             #cv2.waitKey(10)
-        
+    input_img = im                  
     #im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
-    #im = im/255.0
-    #im = (im).astype('int32')
-    #image_data = utils.image_preprocess(np.copy(original_image), [input_size, input_size])
-    #img = img[np.newaxis, ...].astype(np.float32)
-    #print("calibration image {}".format(img[i]))
-    #img = img / 255.0
+    im = im/255.0
+
     
-    #im = Image.fromarray((im * 255).astype('uint8'))
     im = im[np.newaxis, ...].astype(np.float32)
     if SHOW_LOG:
         print('im : {}'.format(im.shape))
-    input_img = im
-    im = im/255.0
+    
+    #im = im/255.0
     #im = tf.expand_dims(im, axis=0)
     #im = im.numpy()
     
     #print('im:{}'.format(im.shape))
     #print('im: {}'.format(im))
     input = input_details[0]
-    int8 = input['dtype'] == np.uint8  # is TFLite quantized uint8 model (np.uint8)
+    #int8 = input['dtype'] == np.int8
+    int8 = input['dtype'] == np.int8  # is TFLite quantized uint8 model (np.uint8)
     #int32 = input['dtype'] == np.int32  # is TFLite quantized uint8 model (np.uint8)
     #print('input[dtype] : {}'.format(input['dtype']))
     if int8:
         #print('is TFLite quantized uint8 model')
         scale, zero_point = input['quantization']
-        im = (im / scale + zero_point).astype(np.uint8)  # de-scale
-        #im = im.astype(np.uint8)
+        #im = (im / scale + zero_point).astype(np.uint8)  # de-scale
+        im = (im / scale + zero_point).astype(np.int8)  # de-scale
+        #im = im.astype(np.int8)
         if SHOW_LOG:
             print('after de-scale {}'.format(im))
     interpreter.set_tensor(input['index'], im)
@@ -215,14 +179,14 @@ def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True, save_image=
             if save_image:
                 #cv2.imshow('out_image',gen_img)
                 filename = 'out_image_' + str(cnt) + '.jpg'
-                file_path = os.path.join('./runs/detect/gen_images/',filename)
+                file_path = os.path.join(save_gen_image_dir,filename)
                 cv2.imwrite(file_path,gen_img)
                 #cv2.waitKey(10)
             #gen_img = renormalize(gen_img)
             #gen_img = tf.transpose(gen_img, perm=[0,1,2])
             #plt.imshow(gen_img)
             #plt.show()
-        if int8:
+        else:
             scale, zero_point = output['quantization']
             x = (x.astype(np.float32)-zero_point) * scale  # re-scale
             #x = x.astype(np.float32)
@@ -237,7 +201,7 @@ def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True, save_image=
         print('input image : {}'.format(input_img.shape))
         print('gen_img : {}'.format(gen_img))
         print('gen_img : {}'.format(gen_img.shape))
-    latent_i = y[1]
+    latent_i = y[0]
     latent_o = y[2]
     if SHOW_LOG:
         print('latent_i : {}'.format(latent_i))
@@ -250,14 +214,14 @@ def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True, save_image=
     return _g_loss, gen_img
 
 def g_loss(input_img, gen_img, latent_i, latent_o):
-    
+    #from tensorflow.keras import losses as losses
     def l1_loss(A,B):
-        return np.mean((abs(A-B)).flatten())
+        return np.mean(np.abs(A-B))
     def l2_loss(A,B):
-        return np.mean(np.sqrt((A-B)*(A-B)).flatten())
+        return np.mean((A-B)*(A-B))
     # tf loss
-    #l2_loss = tf.keras.losses.MeanSquaredError()
-    #l1_loss = tf.keras.losses. MeanAbsoluteError()
+    #l2_loss = losses.MeanSquaredError()
+    #l1_loss = losses.MeanAbsoluteError()
     #bce_loss = tf.keras.losses.BinaryCrossentropy()
     
     # adversarial loss (use feature matching)
@@ -299,20 +263,6 @@ def infer(test_dataset, w, SHOW_MAX_NUM, show_img, data_type, tflite, edgetpu):
         
         g_loss,fake_img = detect_image(w, images, interpreter, tflite=True,edgetpu=False, save_image=True, cnt=1)
         
-        
-        #g_loss = 0.0
-        #print("input")
-        #print(self.input)
-        #print("gen_img")
-        #print(self.gen_img)
-        #images = renormalize(images)
-        #fake_img = renormalize(fake_img)
-        #fake_img = self.gen_img
-        #images = images.cpu().numpy()
-        #fake_img = fake_img.cpu().numpy()
-        #fake_img = self.gen_img
-        #print(fake_img.shape)
-        #print(images.shape)
         if show_img:
             #plt = self.plot_images(images,fake_img)
             if data_type=='normal':
@@ -343,7 +293,7 @@ def renormalize(tensor):
     maxTo = 1
     return minTo + (maxTo - minTo) * ((tensor - minFrom) / (maxFrom - minFrom))
 
-def plot_loss_distribution(SHOW_MAX_NUM,positive_loss,defeat_loss):
+def plot_loss_distribution(SHOW_MAX_NUM,positive_loss,defeat_loss,name):
     # Importing packages
     import matplotlib.pyplot as plt2
     # Define data values
@@ -362,7 +312,8 @@ def plot_loss_distribution(SHOW_MAX_NUM,positive_loss,defeat_loss):
     plt2.scatter(x,y,s=1)
     plt2.scatter(x,z,s=1) 
     os.makedirs('./runs/detect',exist_ok=True)
-    file_path = os.path.join('./runs/detect','loss_distribution_100.jpg')
+    filename = str(name) + '.jpg'
+    file_path = os.path.join('./runs/detect',filename)
     plt2.savefig(file_path)
     plt2.show()
 
@@ -370,7 +321,7 @@ def plot_loss_distribution(SHOW_MAX_NUM,positive_loss,defeat_loss):
 def plot_two_loss_histogram(normal_list, abnormal_list, name):
     import numpy
     from matplotlib import pyplot
-    bins = numpy.linspace(0, 8, 100)
+    bins = numpy.linspace(0, 10, 100)
     pyplot.hist(normal_list, bins, alpha=0.5, label='normal')
     pyplot.hist(abnormal_list, bins, alpha=0.5, label='abnormal')
     pyplot.legend(loc='upper right')
@@ -380,7 +331,7 @@ def plot_two_loss_histogram(normal_list, abnormal_list, name):
     pyplot.savefig(file_path)
     pyplot.show()
 
-def infer_python(img_dir,interpreter,SHOW_MAX_NUM,save_image=False):
+def infer_python(img_dir,interpreter,SHOW_MAX_NUM,save_image=False,name='normal'):
     import glob
     image_list = glob.glob(os.path.join(img_dir,'*.jpg'))
     loss_list = []
@@ -390,7 +341,7 @@ def infer_python(img_dir,interpreter,SHOW_MAX_NUM,save_image=False):
         cnt+=1
         
         if cnt<=SHOW_MAX_NUM:
-            loss,gen_img = detect_image(w, image_path, interpreter=interpreter, tflite=True,edgetpu=False, save_image=save_image, cnt=cnt)
+            loss,gen_img = detect_image(w, image_path, interpreter=interpreter, tflite=False,edgetpu=True, save_image=save_image, cnt=cnt, name=name)
             print('{} loss: {}'.format(cnt,loss))
             loss_list.append(loss)
     
@@ -421,20 +372,21 @@ if __name__=="__main__":
         
     if INFER:
         #import tensorflow as tf
-        test_data_dir = r'/home/ali/GitHub_Code/YOLO/YOLOV5/runs/detect/factory_data/crops_line/line'
-        abnormal_test_data_dir = r'/home/ali/GitHub_Code/YOLO/YOLOV5/runs/detect/factory_data/crops_noline/noline'
+        test_data_dir = r'/home/ali/Desktop/factory_data/crops_2cls_small/line'
+        abnormal_test_data_dir = r'/home/ali/Desktop/factory_data/crops_2cls_small/noline'
         (img_height, img_width) = (64,64)
         batch_size_ = 1
         shuffle = False
-        SHOW_MAX_NUM = 500
+        SHOW_MAX_NUM = 1500
         save_image=True
-        w = r'/home/ali/GitHub_Code/cuteboyqq/GANomaly/GANomaly-tf2/export_model/G-uint8-20221109.tflite'
-        interpreter = get_interpreter(w,tflite=True,edgetpu=False)
-        line_loss = infer_python(test_data_dir,interpreter,SHOW_MAX_NUM,save_image=save_image)
+        w = r'/home/ali/Desktop/GANomaly-tf2/export_model/G-int8-64nz100-20221111_edgetpu.tflite'
+        interpreter = get_interpreter(w,tflite=False,edgetpu=True)
+        line_loss = infer_python(test_data_dir,interpreter,SHOW_MAX_NUM,save_image=save_image, name='normal')
         
-        noline_loss = infer_python(abnormal_test_data_dir,interpreter,SHOW_MAX_NUM)
-        plot_loss_distribution(SHOW_MAX_NUM,line_loss,noline_loss)
-        plot_two_loss_histogram(line_loss,noline_loss,'line_noline')
+    
+        noline_loss = infer_python(abnormal_test_data_dir,interpreter,SHOW_MAX_NUM, save_image=save_image, name='abnormal')
+        plot_loss_distribution(SHOW_MAX_NUM,line_loss,noline_loss,'loss_di_int8_64nz100_20221111')
+        plot_two_loss_histogram(line_loss,noline_loss,'line_noline_int8_64nz100_20221111')
         #=================================================
         #if plt have QT error try
         #pip uninstall opencv-python
