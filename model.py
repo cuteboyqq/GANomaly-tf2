@@ -497,7 +497,8 @@ class GANomaly(GANRunner):
             os.makedirs(save_ori_image_dir,exist_ok=True)
             os.makedirs(save_gen_image_dir,exist_ok=True)
             
-            ori_image = tf.squeeze(self.input*255)           
+            ori_image = tf.squeeze(self.input)
+            ori_image = renormalize(ori_image,0,255)
             ori_image = ori_image.cpu().numpy()
             filename = 'ori_image_' + str(cnt) + '.jpg'
             file_path = os.path.join(save_ori_image_dir, filename)
