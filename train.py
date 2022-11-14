@@ -256,7 +256,7 @@ def main(_):
             image_path = r'/home/ali/GitHub_Code/YOLO/YOLOV5/runs/detect/factory_data/crops/noline/ori_video_ver235.jpg'
             image = cv2.imread(image_path)
             #image = cv2.cvtColor(image,cv2.COLOR_BGR2RGB)
-            image = cv2.resize(image,(64,64))
+            image = cv2.resize(image,(isize,isize))
             #image = tf.expand_dims(image, axis=0)
             
             image = image/255.0

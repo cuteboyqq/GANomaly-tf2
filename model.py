@@ -535,7 +535,7 @@ class GANomaly(GANRunner):
             
         return g_loss,out_image
         
-    def infer_python(self, img_dir,SHOW_MAX_NUM,save_image=False,name='normal',isize=32):
+    def infer_python(self, img_dir,SHOW_MAX_NUM,save_image=False,name='normal',isize=64):
         import glob
         import cv2
         image_list = glob.glob(os.path.join(img_dir,'*.jpg'))
@@ -547,9 +547,14 @@ class GANomaly(GANRunner):
             cnt+=1
             image = cv2.imread(image_path)
             #image = cv2.cvtColor(image,cv2.COLOR_BGR2RGB)
-            image = cv2.resize(image,(64,64))
+            image = cv2.resize(image,(isize,isize))
             #image = tf.expand_dims(image, axis=0)
             image = image/255.0
+           
+            #tf.convert_to_tensor(image)
+            #image = tf.convert_to_tensor(image)
+
+            #tf.expand_dims(image,axis=0)
             image = image[np.newaxis, ...].astype(np.float32)
             if cnt<=SHOW_MAX_NUM:
                 loss,gen_img = self.infer_cropimage(image, save_img=save_image, show_log=False, name=name, cnt=cnt, load_model=False)
