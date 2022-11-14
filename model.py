@@ -462,19 +462,75 @@ class GANomaly(GANRunner):
         return minTo + (maxTo - minTo) * ((tensor - minFrom) / (maxFrom - minFrom))
     
     
-    def infer_cropimage(self,image):
+    def infer_cropimage(self, image, save_img=False, show_log=False, name='factory_data', cnt=1):
+        self.load_best()
+        def renormalize(tensor,minto, maxto):
+                minFrom= tf.math.reduce_min(tensor)
+                maxFrom= tf.math.reduce_max(tensor)
+                #minFrom= tensor.min() #tf.reduce_min
+                #maxFrom= tensor.max()
+                minTo = minto
+                maxTo = maxto
+                return minTo + (maxTo - minTo) * ((tensor - minFrom) / (maxFrom - minFrom))
+            
+        import cv2
         abnormal = 0
         self.input = image
         self.latent_i, self.gen_img, self.latent_o = self.G(self.input)
         self.pred_real, self.feat_real = self.D(self.input)
         self.pred_fake, self.feat_fake = self.D(self.gen_img)
         g_loss = self.g_loss()
-        if g_loss>1.0:
+        
+        print('g_loss: {}'.format(g_loss))
+        if g_loss>2.0:
             abnormal=1
             print('abnoraml')
         else:
             abnormal=0
             print('normal')
+            
+            
+        if save_img:
+            save_ori_image_dir = os.path.join('./runs/detect',name,'ori_images')
+            save_gen_image_dir = os.path.join('./runs/detect',name,'gen_images')
+
+            os.makedirs(save_ori_image_dir,exist_ok=True)
+            os.makedirs(save_gen_image_dir,exist_ok=True)
+            
+            ori_image = tf.squeeze(self.input*255)           
+            ori_image = ori_image.cpu().numpy()
+            filename = 'ori_image_' + str(cnt) + '.jpg'
+            file_path = os.path.join(save_ori_image_dir, filename)
+            cv2.imwrite(file_path, ori_image)
+            #cv2.imshow('ori_img',ori_image)
+            #cv2.waitKey(10)
+            out_image = tf.squeeze(self.gen_img)  
+            out_image = renormalize(out_image,0,255)
+            #out_image = renormalize(out_image,0,255)
+            #out_image = out_image*255
+               
+            
+            out_image = out_image.cpu().numpy()
+            #out_image = np.squeeze(out_image)
+            #out_image = renormalize(out_image)
+            
+            filename = 'out_image_' + str(cnt) + '.jpg'
+            file_path = os.path.join(save_gen_image_dir,filename)
+            cv2.imwrite(file_path, out_image)
+            #cv2.imshow('gen_img',out_image)
+            #cv2.waitKey(10)
+        if show_log:
+            print('ori image : {}'.format(ori_image.shape))
+            print('ori image : {}'.format(ori_image))
+            print('for infer : {}'.format(self.input.shape))
+            print('for infer : {}'.format(self.input))
+            print('out image : {}'.format(out_image.shape))
+            print('out image : {}'.format(out_image))
+            print('lentent_i : {}'.format(self.latent_i.shape))
+            print('lentent_i : {}'.format(self.latent_i))
+            print('lentent_o : {}'.format(self.latent_o.shape))
+            print('lentent_o : {}'.format(self.latent_o))
+            
         return abnormal
         
     def infer(self, test_dataset,SHOW_MAX_NUM,show_img,data_type):
@@ -540,7 +596,7 @@ class GANomaly(GANRunner):
                 ax.get_yaxis().set_visible(False)
         return plt
     
-    def plot_loss_distribution(self, SHOW_MAX_NUM,positive_loss,defeat_loss):
+    def plot_loss_distribution(self, SHOW_MAX_NUM,positive_loss,defeat_loss,name):
         # Importing packages
         import matplotlib.pyplot as plt2
         # Define data values
@@ -557,14 +613,15 @@ class GANomaly(GANRunner):
         plt2.scatter(x,y,s=1)
         plt2.scatter(x,z,s=1) 
         os.makedirs('./runs/detect',exist_ok=True)
-        file_path = os.path.join('./runs/detect','loss_distribution.jpg')
+        filename = str(name) + '.jpg'
+        file_path = os.path.join('./runs/detect',filename)
         plt2.savefig(file_path)
         plt2.show()
         
     def plot_loss_histogram(self,loss_list, name):
         from matplotlib import pyplot
         import numpy
-        bins = numpy.linspace(0, 3, 100)
+        bins = numpy.linspace(0, 6, 100)
         pyplot.hist(loss_list, bins=bins, alpha=0.5, label=name)
         os.makedirs('./runs/detect',exist_ok=True)
         filename = str(name) + '.jpg'
@@ -576,7 +633,7 @@ class GANomaly(GANRunner):
     def plot_two_loss_histogram(self,normal_list, abnormal_list, name):
         import numpy
         from matplotlib import pyplot
-        bins = numpy.linspace(0, 3, 100)
+        bins = numpy.linspace(0, 6, 100)
         pyplot.hist(normal_list, bins, alpha=0.5, label='normal')
         pyplot.hist(abnormal_list, bins, alpha=0.5, label='abnormal')
         pyplot.legend(loc='upper right')

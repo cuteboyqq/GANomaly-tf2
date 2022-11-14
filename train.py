@@ -34,7 +34,7 @@ flags.DEFINE_string("dataset", r'/home/ali/GitHub_Code/YOLO/YOLOV5/runs/detect/f
 #flags.DEFINE_string("dataset", 'cifar10', "name of dataset")
 flags.DEFINE_string("dataset_test", r'/home/ali/GitHub_Code/YOLO/YOLOV5/runs/detect/factory_data/crops_2cls', "name of dataset")
 flags.DEFINE_string("dataset_infer", r'/home/ali/GitHub_Code/YOLO/YOLOV5/runs/detect/factory_data/crops_line', "name of dataset")
-flags.DEFINE_string("dataset_infer_abnormal", r'/home/ali/GitHub_Code/YOLO/YOLOV5/runs/detect/factory_data/crops_noline', "name of dataset")
+flags.DEFINE_string("dataset_infer_abnormal", r'/home/ali/GitHub_Code/YOLO/YOLOV5/runs/detect/factory_data/defect_aug', "name of dataset")
 DATASETS = ['mnist', 'cifar10']
 '''
 flags.register_validator('dataset',
@@ -57,8 +57,9 @@ def process(image,label):
     return image,label
 
 def main(_):
-    show_loss_histogram = True
-    show_loss_distribution = True
+    show_loss_histogram = False
+    show_loss_distribution = False
+    infer_one_image = True
     show_img = False
     TRAIN = False
     opt = FLAGS
@@ -232,17 +233,36 @@ def main(_):
         ganomaly.evaluate_best(test_dataset)
     else:
         if show_img:
-            SHOW_MAX_NUM = 5
+            SHOW_MAX_NUM = 10
         else:
-            SHOW_MAX_NUM = 1800
-        positive_loss = ganomaly.infer(infer_dataset,SHOW_MAX_NUM,show_img,'normal')
-        defeat_loss = ganomaly.infer(infer_dataset_abnormal,SHOW_MAX_NUM,show_img,'abnormal')
-        if show_loss_distribution:
-            ganomaly.plot_loss_distribution( SHOW_MAX_NUM,positive_loss,defeat_loss)
+            SHOW_MAX_NUM = 6000
+            
+        if show_loss_histogram or show_loss_distribution or show_img:
+            positive_loss = ganomaly.infer(infer_dataset,SHOW_MAX_NUM,show_img,'normal')
+            defeat_loss = ganomaly.infer(infer_dataset_abnormal,SHOW_MAX_NUM,show_img,'abnormal')
+        
+        if show_loss_distribution:    
+            ganomaly.plot_loss_distribution( SHOW_MAX_NUM,positive_loss,defeat_loss,'32nz100_loss6000')
         if show_loss_histogram:
-            ganomaly.plot_loss_histogram(positive_loss,'plositvie')
-            ganomaly.plot_loss_histogram(defeat_loss,'negative')
-            ganomaly.plot_two_loss_histogram(positive_loss,defeat_loss,'normal_abnormal_histogram0')
+            ganomaly.plot_loss_histogram(positive_loss,'plositvie32nz100-6000')
+            ganomaly.plot_loss_histogram(defeat_loss,'negative32nz100-6000')
+            ganomaly.plot_two_loss_histogram(positive_loss,defeat_loss,'32nz100_histogram-6000')
+        
+        if infer_one_image:
+            save_img = True
+            show_log = True
+            image_path = r'/home/ali/GitHub_Code/YOLO/YOLOV5/runs/detect/factory_data/crops_line/line/ori_video_ver25456.jpg'
+            image = cv2.imread(image_path)
+            #image = cv2.cvtColor(image,cv2.COLOR_BGR2RGB)
+            image = cv2.resize(image,(64,64))
+            #image = tf.expand_dims(image, axis=0)
+            
+            image = image/255.0
+            image = image[np.newaxis, ...].astype(np.float32)
+            print('input image shape for inference : {}'.format(image.shape))
+            print('Start inference one image : \n {}'.format(str(image_path)))
+            ganomaly.infer_cropimage(image, save_img=save_img, show_log=show_log, name='factory_data_20221114', cnt=1)
+            print('finish inference one image')
     #print(loss_list)
     #print(loss_abnormal_list)
 if __name__ == '__main__':
