@@ -462,8 +462,9 @@ class GANomaly(GANRunner):
         return minTo + (maxTo - minTo) * ((tensor - minFrom) / (maxFrom - minFrom))
     
     
-    def infer_cropimage(self, image, save_img=False, show_log=False, name='factory_data', cnt=1):
-        self.load_best()
+    def infer_cropimage(self, image, save_img=False, show_log=False, name='factory_data', cnt=1, load_model=True):
+        if load_model:
+            self.load_best()
         def renormalize(tensor,minto, maxto):
                 minFrom= tf.math.reduce_min(tensor)
                 maxFrom= tf.math.reduce_max(tensor)
@@ -481,7 +482,7 @@ class GANomaly(GANRunner):
         self.pred_fake, self.feat_fake = self.D(self.gen_img)
         g_loss = self.g_loss()
         
-        print('g_loss: {}'.format(g_loss))
+        print('{} loss: {}'.format(cnt,g_loss))
         if g_loss>2.0:
             abnormal=1
             print('abnoraml')
@@ -532,8 +533,33 @@ class GANomaly(GANRunner):
             print('lentent_o : {}'.format(self.latent_o.shape))
             print('lentent_o : {}'.format(self.latent_o))
             
-        return abnormal
+        return g_loss,out_image
         
+    def infer_python(self, img_dir,SHOW_MAX_NUM,save_image=False,name='normal',isize=32):
+        import glob
+        import cv2
+        image_list = glob.glob(os.path.join(img_dir,'*.jpg'))
+        loss_list = []
+        self.load_best()
+        cnt = 0
+        for image_path in image_list:
+            #print(image_path)
+            cnt+=1
+            image = cv2.imread(image_path)
+            #image = cv2.cvtColor(image,cv2.COLOR_BGR2RGB)
+            image = cv2.resize(image,(64,64))
+            #image = tf.expand_dims(image, axis=0)
+            image = image/255.0
+            image = image[np.newaxis, ...].astype(np.float32)
+            if cnt<=SHOW_MAX_NUM:
+                loss,gen_img = self.infer_cropimage(image, save_img=save_image, show_log=False, name=name, cnt=cnt, load_model=False)
+                #loss,gen_img = detect_image(w, image_path, interpreter=interpreter, tflite=False,edgetpu=True, save_image=save_image, cnt=cnt, name=name,isize=isize)
+                #print('{} loss: {}'.format(cnt,loss))
+                loss_list.append(loss.numpy())
+        
+        
+        return loss_list
+    
     def infer(self, test_dataset,SHOW_MAX_NUM,show_img,data_type):
         show_num = 0
         self.load_best()
@@ -579,7 +605,7 @@ class GANomaly(GANRunner):
                 print('{} normal: {}'.format(show_num,g_loss.numpy()))
             else:
                 print('{} abnormal: {}'.format(show_num,g_loss.numpy()))
-            loss_list.append(g_loss.numpy())
+            loss_list.append(float(g_loss))
             show_num+=1
             #if show_num%20==0:
                 #print(show_num)

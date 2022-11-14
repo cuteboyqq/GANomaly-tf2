@@ -59,7 +59,8 @@ def process(image,label):
 def main(_):
     show_loss_histogram = False
     show_loss_distribution = False
-    infer_one_image = True
+    infer_one_image = False
+    infer_images = True
     show_img = False
     TRAIN = False
     opt = FLAGS
@@ -235,7 +236,7 @@ def main(_):
         if show_img:
             SHOW_MAX_NUM = 10
         else:
-            SHOW_MAX_NUM = 6000
+            SHOW_MAX_NUM = 5900
             
         if show_loss_histogram or show_loss_distribution or show_img:
             positive_loss = ganomaly.infer(infer_dataset,SHOW_MAX_NUM,show_img,'normal')
@@ -251,7 +252,8 @@ def main(_):
         if infer_one_image:
             save_img = True
             show_log = True
-            image_path = r'/home/ali/GitHub_Code/YOLO/YOLOV5/runs/detect/factory_data/crops_line/line/ori_video_ver25456.jpg'
+            #image_path = r'/home/ali/GitHub_Code/YOLO/YOLOV5/runs/detect/factory_data/crops_line/line/ori_video_ver25461.jpg'
+            image_path = r'/home/ali/GitHub_Code/YOLO/YOLOV5/runs/detect/factory_data/crops/noline/ori_video_ver235.jpg'
             image = cv2.imread(image_path)
             #image = cv2.cvtColor(image,cv2.COLOR_BGR2RGB)
             image = cv2.resize(image,(64,64))
@@ -261,8 +263,22 @@ def main(_):
             image = image[np.newaxis, ...].astype(np.float32)
             print('input image shape for inference : {}'.format(image.shape))
             print('Start inference one image : \n {}'.format(str(image_path)))
-            ganomaly.infer_cropimage(image, save_img=save_img, show_log=show_log, name='factory_data_20221114', cnt=1)
+            g_loss,out_image = ganomaly.infer_cropimage(image, save_img=save_img, show_log=show_log, name='factory_data_20221114', cnt=1)
             print('finish inference one image')
+        if infer_images:
+            img_dir = r'/home/ali/GitHub_Code/YOLO/YOLOV5/runs/detect/factory_data/crops_line/line'
+            loss_normal_list = ganomaly.infer_python(img_dir,SHOW_MAX_NUM,save_image=True,name='normal-20221114',isize=64)
+            
+            img_dir = r'/home/ali/GitHub_Code/YOLO/YOLOV5/runs/detect/factory_data/defect_aug/noline'
+            loss_abnormal_list = ganomaly.infer_python(img_dir,SHOW_MAX_NUM,save_image=True,name='abnormal-20221114',isize=64)
+            
+            print('loss_normal_list: {}'.format(loss_normal_list))
+            print('loss_abnormal_list: {}'.format(loss_abnormal_list))
+            
+            ganomaly.plot_loss_distribution( SHOW_MAX_NUM,loss_normal_list,loss_abnormal_list,'64nz100_20221114')
+            print('Start plot_two_loss_histogram')
+            ganomaly.plot_two_loss_histogram(loss_normal_list,loss_abnormal_list,'64nz100_20221114_histogram')
+            print('Finish plot_two_loss_histogram')
     #print(loss_list)
     #print(loss_abnormal_list)
 if __name__ == '__main__':
