@@ -88,8 +88,8 @@ def get_interpreter(w,tflite=False,edgetpu=True):
         print('output details : \n{}'.format(output_details))
     return interpreter
 
-def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True, save_image=True, cnt=1, name='normal'):
-    SHOW_LOG=False
+def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True, save_image=True, cnt=1, name='normal',isize=32):
+    SHOW_LOG=True
     INFER=False
     ONLY_DETECT_ONE_IMAGE=True
     if interpreter is None:
@@ -119,7 +119,7 @@ def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True, save_image=
         #plt.show()
     elif ONLY_DETECT_ONE_IMAGE:
         im = cv2.imread(im)
-        im = cv2.resize(im, (64, 64))
+        im = cv2.resize(im, (isize, isize))
         #input_img = im
         if save_image:
         #cv2.imshow('ori_image',im)
@@ -130,7 +130,6 @@ def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True, save_image=
     input_img = im                  
     #im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
     im = im/255.0
-
     
     im = im[np.newaxis, ...].astype(np.float32)
     if SHOW_LOG:
@@ -163,7 +162,7 @@ def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True, save_image=
         x = interpreter.get_tensor(output['index'])
         #print(x.shape)
         #print(x)
-        if x.shape[1]==64:
+        if x.shape[1]==isize:
             #print('get out images')
             
             scale, zero_point = output['quantization']
@@ -172,6 +171,8 @@ def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True, save_image=
             #x = x.astype(np.float32)
             #x = tf.squeeze(x)
             #x = x.numpy()
+            
+            
             gen_img = x*255
             
             gen_img = np.squeeze(gen_img)
@@ -202,7 +203,7 @@ def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True, save_image=
         print('gen_img : {}'.format(gen_img))
         print('gen_img : {}'.format(gen_img.shape))
     latent_i = y[0]
-    latent_o = y[2]
+    latent_o = y[1]
     if SHOW_LOG:
         print('latent_i : {}'.format(latent_i))
         print('latent_o : {}'.format(latent_o))
@@ -331,7 +332,7 @@ def plot_two_loss_histogram(normal_list, abnormal_list, name):
     pyplot.savefig(file_path)
     pyplot.show()
 
-def infer_python(img_dir,interpreter,SHOW_MAX_NUM,save_image=False,name='normal'):
+def infer_python(img_dir,interpreter,SHOW_MAX_NUM,save_image=False,name='normal',isize=32):
     import glob
     image_list = glob.glob(os.path.join(img_dir,'*.jpg'))
     loss_list = []
@@ -341,7 +342,7 @@ def infer_python(img_dir,interpreter,SHOW_MAX_NUM,save_image=False,name='normal'
         cnt+=1
         
         if cnt<=SHOW_MAX_NUM:
-            loss,gen_img = detect_image(w, image_path, interpreter=interpreter, tflite=False,edgetpu=True, save_image=save_image, cnt=cnt, name=name)
+            loss,gen_img = detect_image(w, image_path, interpreter=interpreter, tflite=False,edgetpu=True, save_image=save_image, cnt=cnt, name=name,isize=isize)
             print('{} loss: {}'.format(cnt,loss))
             loss_list.append(loss)
     
@@ -351,8 +352,8 @@ def infer_python(img_dir,interpreter,SHOW_MAX_NUM,save_image=False,name='normal'
 if __name__=="__main__":
     PYCORAL = False
     DETECT = False
-    DETECT_IMAGE = False
-    INFER = True
+    DETECT_IMAGE = True
+    INFER = False
     if DETECT:
         w=r'/home/ali/Desktop/GANomaly-tf2/export_model/G-uint8-20221104_edgetpu.tflite'
         #w=r'/home/ali/GitHub_Code/cuteboyqq/GANomaly/GANomaly-tf2/export_model/G-uint8-new.tflite'
@@ -362,11 +363,13 @@ if __name__=="__main__":
         
     if DETECT_IMAGE:
         save_image = True
-        im = r'/home/ali/Desktop/factory_data/crops_1cls/line/ori_video_ver2121.jpg'
+        #im = r'/home/ali/Desktop/factory_data/crops_2cls_small/line/ori_video_ver21913.jpg'
+        im = r'/home/ali/Desktop/factory_data/crops_2cls_small/line/ori_video_ver23222.jpg'
         #im = r'/home/ali/Desktop/factory_data/crops_2cls_small/noline/ori_video_ver244.jpg'
         #w=r'/home/ali/GitHub_Code/cuteboyqq/GANomaly/GANomaly-tf2/export_model/G-uint8-new_edgetpu.tflite'
         #w=r'/home/ali/Desktop/GANomaly-tf2/export_model/G-uint8-20221104.tflite'
-        w = r'/home/ali/Desktop/GANomaly-tf2/export_model/G-uint8-20221104_edgetpu.tflite'
+        w = r'/home/ali/Desktop/GANomaly-tf2/export_model/32nz100-20221111-G-int8_edgetpu.tflite'
+        #w = r'/home/ali/Desktop/GANomaly-tf2/export_model/32nz100-20221111-G-int8.tflite'
         loss, gen_image = detect_image(w, im, tflite=False,edgetpu=True, save_image=True)
         
         
@@ -374,19 +377,20 @@ if __name__=="__main__":
         #import tensorflow as tf
         test_data_dir = r'/home/ali/Desktop/factory_data/crops_2cls_small/line'
         abnormal_test_data_dir = r'/home/ali/Desktop/factory_data/crops_2cls_small/noline'
-        (img_height, img_width) = (64,64)
+        (img_height, img_width) = (32,32)
+        isize=32
         batch_size_ = 1
         shuffle = False
         SHOW_MAX_NUM = 1500
         save_image=True
-        w = r'/home/ali/Desktop/GANomaly-tf2/export_model/G-int8-64nz100-20221111_edgetpu.tflite'
+        w = r'/home/ali/Desktop/GANomaly-tf2/export_model/32nz100-20221111-G-int8_edgetpu.tflite'
         interpreter = get_interpreter(w,tflite=False,edgetpu=True)
-        line_loss = infer_python(test_data_dir,interpreter,SHOW_MAX_NUM,save_image=save_image, name='normal')
+        line_loss = infer_python(test_data_dir,interpreter,SHOW_MAX_NUM,save_image=save_image, name='normal', isize=isize)
         
     
-        noline_loss = infer_python(abnormal_test_data_dir,interpreter,SHOW_MAX_NUM, save_image=save_image, name='abnormal')
-        plot_loss_distribution(SHOW_MAX_NUM,line_loss,noline_loss,'loss_di_int8_64nz100_20221111')
-        plot_two_loss_histogram(line_loss,noline_loss,'line_noline_int8_64nz100_20221111')
+        noline_loss = infer_python(abnormal_test_data_dir,interpreter,SHOW_MAX_NUM, save_image=save_image, name='abnormal',isize=isize)
+        plot_loss_distribution(SHOW_MAX_NUM,line_loss,noline_loss,'loss_di_int8_32nz100-20221111')
+        plot_two_loss_histogram(line_loss,noline_loss,'line_noline_int8_32nz100-20221111')
         #=================================================
         #if plt have QT error try
         #pip uninstall opencv-python
