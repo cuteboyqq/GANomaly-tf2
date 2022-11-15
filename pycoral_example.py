@@ -89,7 +89,7 @@ def get_interpreter(w,tflite=False,edgetpu=True):
     return interpreter
 
 def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True, save_image=True, cnt=1, name='normal',isize=32):
-    SHOW_LOG=True
+    SHOW_LOG=False
     INFER=False
     ONLY_DETECT_ONE_IMAGE=True
     if interpreter is None:
@@ -128,7 +128,7 @@ def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True, save_image=
             cv2.imwrite(file_path,im)
             #cv2.waitKey(10)
     input_img = im                  
-    #im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
+    im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
     im = im/255.0
     
     im = im[np.newaxis, ...].astype(np.float32)
@@ -176,6 +176,7 @@ def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True, save_image=
             gen_img = x*255
             
             gen_img = np.squeeze(gen_img)
+            gen_img = cv2.cvtColor(gen_img, cv2.COLOR_RGB2BGR)
             #print('after squeeze & numpy x : {}'.format(x))
             if save_image:
                 #cv2.imshow('out_image',gen_img)
@@ -203,7 +204,7 @@ def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True, save_image=
         print('gen_img : {}'.format(gen_img))
         print('gen_img : {}'.format(gen_img.shape))
     latent_i = y[0]
-    latent_o = y[1]
+    latent_o = y[2]
     if SHOW_LOG:
         print('latent_i : {}'.format(latent_i))
         print('latent_o : {}'.format(latent_o))
@@ -332,6 +333,47 @@ def plot_two_loss_histogram(normal_list, abnormal_list, name):
     pyplot.savefig(file_path)
     pyplot.show()
 
+def Analysis_two_list(normal_list, abnormal_list, name):
+    import math
+    import numpy
+    normal_count_list = [0]*13
+    abnormal_count_list = [0]*13
+    for i in range(len(normal_list)):
+        normal_count_list[int(normal_list[i])]+=1
+    print('normal_count_list')
+    for i in range(len(normal_count_list)):
+        print('{}: {}'.format(i,normal_count_list[i]))
+    
+    for i in range(len(abnormal_list)):
+        abnormal_count_list[int(abnormal_list[i])]+=1
+    print('abnormal_count_list')
+    for i in range(len(abnormal_count_list)):
+        print('{}: {}'.format(i,abnormal_count_list[i]))
+    
+    overlap_normal_count = 0
+    overlap_abnormal_count = 0
+    overlap_count = 0
+    for i in range(len(normal_count_list)):
+        if normal_count_list[i]!=0 and abnormal_count_list[i]!=0:
+            overlap_normal_count += normal_count_list[i]
+            overlap_abnormal_count += abnormal_count_list[i]
+            overlap_count += min(normal_count_list[i],abnormal_count_list[i])
+    print('overlap_normal_count: {}'.format(overlap_normal_count))
+    print('overlap_abnormal_count: {}'.format(overlap_abnormal_count))
+    print('overlap_count: {}'.format(overlap_count))
+    
+    from matplotlib import pyplot
+    bins = numpy.linspace(0, 13, 100)
+    pyplot.hist(normal_list, bins, alpha=0.5, label='normal')
+    pyplot.hist(abnormal_list, bins, alpha=0.5, label='abnormal')
+    pyplot.legend(loc='upper right')
+    os.makedirs('./runs/detect',exist_ok=True)
+    filename = str(name) + '.jpg'
+    file_path = os.path.join('./runs/detect',filename)
+    pyplot.savefig(file_path)
+    pyplot.show()
+       
+
 def infer_python(img_dir,interpreter,SHOW_MAX_NUM,save_image=False,name='normal',isize=32):
     import glob
     image_list = glob.glob(os.path.join(img_dir,'*.jpg'))
@@ -352,8 +394,9 @@ def infer_python(img_dir,interpreter,SHOW_MAX_NUM,save_image=False,name='normal'
 if __name__=="__main__":
     PYCORAL = False
     DETECT = False
-    DETECT_IMAGE = True
-    INFER = False
+    DETECT_IMAGE = False
+    INFER = True
+    Analysis = True
     if DETECT:
         w=r'/home/ali/Desktop/GANomaly-tf2/export_model/G-uint8-20221104_edgetpu.tflite'
         #w=r'/home/ali/GitHub_Code/cuteboyqq/GANomaly/GANomaly-tf2/export_model/G-uint8-new.tflite'
@@ -378,19 +421,22 @@ if __name__=="__main__":
         test_data_dir = r'/home/ali/Desktop/factory_data/crops_2cls_small/line'
         abnormal_test_data_dir = r'/home/ali/Desktop/factory_data/crops_2cls_small/noline'
         (img_height, img_width) = (32,32)
-        isize=32
+        isize=64
         batch_size_ = 1
         shuffle = False
         SHOW_MAX_NUM = 1500
         save_image=True
-        w = r'/home/ali/Desktop/GANomaly-tf2/export_model/32nz100-20221111-G-int8_edgetpu.tflite'
+        w = r'/home/ali/Desktop/GANomaly-tf2/export_model/64nz100-20221115-G-int8_edgetpu.tflite'
         interpreter = get_interpreter(w,tflite=False,edgetpu=True)
-        line_loss = infer_python(test_data_dir,interpreter,SHOW_MAX_NUM,save_image=save_image, name='normal', isize=isize)
+        line_loss = infer_python(test_data_dir,interpreter,SHOW_MAX_NUM,save_image=save_image, name='normal-20221115', isize=isize)
         
     
-        noline_loss = infer_python(abnormal_test_data_dir,interpreter,SHOW_MAX_NUM, save_image=save_image, name='abnormal',isize=isize)
-        plot_loss_distribution(SHOW_MAX_NUM,line_loss,noline_loss,'loss_di_int8_32nz100-20221111')
-        plot_two_loss_histogram(line_loss,noline_loss,'line_noline_int8_32nz100-20221111')
+        noline_loss = infer_python(abnormal_test_data_dir,interpreter,SHOW_MAX_NUM, save_image=save_image, name='abnormal-20221115',isize=isize)
+        plot_loss_distribution(SHOW_MAX_NUM,line_loss,noline_loss,'loss_di_int8_64nz100-20221115')
+        plot_two_loss_histogram(line_loss,noline_loss,'line_noline_int8_64nz100-20221115')
+        
+        if Analysis:
+            Analysis_two_list(line_loss, noline_loss, 'count-histogram-20221115')
         #=================================================
         #if plt have QT error try
         #pip uninstall opencv-python
@@ -436,4 +482,7 @@ if __name__=="__main__":
         noline_loss = infer(test_dataset_abnormal, w, SHOW_MAX_NUM, show_img, noline_data_type,tflite=False,edgetpu=True)
         
         plot_loss_distribution(SHOW_MAX_NUM,line_loss,noline_loss)
+    
         '''
+        
+    
