@@ -14,7 +14,7 @@ from pycoral.adapters import common
 from pycoral.adapters import classify
 from PIL import Image
 
-def Pycoral_Edgetpu():
+def Pycoral_Edgetpu(w):
     # Specify the TensorFlow model, labels, and image
     #script_dir = pathlib.Path(__file__).parent.absolute()
     script_dir = r'/home/ali/Desktop/GANomaly-tf2/export_model'
@@ -24,7 +24,7 @@ def Pycoral_Edgetpu():
 
     # Initialize the TF interpreter
     print('Start interpreter')
-    interpreter = edgetpu.make_interpreter(model_file)
+    interpreter = edgetpu.make_interpreter(w)
     print('End interpreter')
 
     print('Start allocate_tensors')
@@ -35,6 +35,9 @@ def Pycoral_Edgetpu():
     output_details = interpreter.get_output_details()  # outputs 
     print('input details : \n{}'.format(input_details))
     print('output details : \n{}'.format(output_details))
+    
+    
+    return interpreter
     # Resize the image
     #size = common.input_size(interpreter)
     #image = Image.open(image_file).convert('RGB').resize(size, Image.ANTIALIAS)
@@ -92,6 +95,8 @@ def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True, save_image=
     SHOW_LOG=False
     INFER=False
     ONLY_DETECT_ONE_IMAGE=True
+    USE_PIL = False
+    USE_OPENCV = True
     if interpreter is None:
         print('interpreter is None, get interpreter now')
         interpreter = get_interpreter(w,tflite,edgetpu)
@@ -118,8 +123,17 @@ def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True, save_image=
         #plt.imshow(im)
         #plt.show()
     elif ONLY_DETECT_ONE_IMAGE:
-        im = cv2.imread(im)
-        im = cv2.resize(im, (isize, isize))
+        if USE_PIL:
+            im = Image.open(im)
+            im = im.convert('RGB')
+            im = im.resize((isize,isize))
+            im = np.asarray(im)
+            input_img = im
+        if USE_OPENCV:
+            im = cv2.imread(im)
+            im = cv2.resize(im, (isize, isize))
+            input_img = im
+            im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
         #input_img = im
         if save_image:
         #cv2.imshow('ori_image',im)
@@ -127,8 +141,8 @@ def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True, save_image=
             file_path = os.path.join(save_ori_image_dir, filename)
             cv2.imwrite(file_path,im)
             #cv2.waitKey(10)
-    input_img = im                  
-    im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
+                      
+    #im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
     im = im/255.0
     
     im = im[np.newaxis, ...].astype(np.float32)
@@ -204,7 +218,7 @@ def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True, save_image=
         print('gen_img : {}'.format(gen_img))
         print('gen_img : {}'.format(gen_img.shape))
     latent_i = y[0]
-    latent_o = y[2]
+    latent_o = y[1]
     if SHOW_LOG:
         print('latent_i : {}'.format(latent_i))
         print('latent_o : {}'.format(latent_o))
@@ -221,9 +235,10 @@ def g_loss(input_img, gen_img, latent_i, latent_o):
         return np.mean(np.abs(A-B))
     def l2_loss(A,B):
         return np.mean((A-B)*(A-B))
+    #import tensorflow as tf
     # tf loss
-    #l2_loss = losses.MeanSquaredError()
-    #l1_loss = losses.MeanAbsoluteError()
+    #l2_loss = tf.keras.losses.MeanSquaredError()
+    #l1_loss = tf.keras.losses.MeanAbsoluteError()
     #bce_loss = tf.keras.losses.BinaryCrossentropy()
     
     # adversarial loss (use feature matching)
@@ -407,36 +422,37 @@ if __name__=="__main__":
     if DETECT_IMAGE:
         save_image = True
         #im = r'/home/ali/Desktop/factory_data/crops_2cls_small/line/ori_video_ver21913.jpg'
-        im = r'/home/ali/Desktop/factory_data/crops_2cls_small/line/ori_video_ver23222.jpg'
+        im = r'/home/ali/Desktop/factory_data/crops_2cls_small/line/ori_video_ver22856.jpg'
         #im = r'/home/ali/Desktop/factory_data/crops_2cls_small/noline/ori_video_ver244.jpg'
         #w=r'/home/ali/GitHub_Code/cuteboyqq/GANomaly/GANomaly-tf2/export_model/G-uint8-new_edgetpu.tflite'
         #w=r'/home/ali/Desktop/GANomaly-tf2/export_model/G-uint8-20221104.tflite'
-        w = r'/home/ali/Desktop/GANomaly-tf2/export_model/32nz100-20221111-G-int8_edgetpu.tflite'
+        w = r'/home/ali/Desktop/GANomaly-tf2/export_model/64-nz100-ndf16-ngf16/64-nz100-ndf16-ngf16-20221115-G-int8_edgetpu.tflite'
         #w = r'/home/ali/Desktop/GANomaly-tf2/export_model/32nz100-20221111-G-int8.tflite'
-        loss, gen_image = detect_image(w, im, tflite=False,edgetpu=True, save_image=True)
+        interpreter = Pycoral_Edgetpu(w)
+        loss, gen_image = detect_image(w, im, interpreter=interpreter, tflite=False,edgetpu=True, save_image=True, cnt=1, name='normal',isize=64)
         
         
     if INFER:
         #import tensorflow as tf
-        test_data_dir = r'/home/ali/Desktop/factory_data/crops_2cls_small/line'
-        abnormal_test_data_dir = r'/home/ali/Desktop/factory_data/crops_2cls_small/noline'
+        test_data_dir = r'/home/ali/Desktop/factory_data/f_for_rasp/crops_line/line'
+        abnormal_test_data_dir = r'/home/ali/Desktop/factory_data/f_for_rasp/crops_noline/noline'
         (img_height, img_width) = (32,32)
-        isize=64
+        isize=32
         batch_size_ = 1
         shuffle = False
-        SHOW_MAX_NUM = 1500
+        SHOW_MAX_NUM = 2000
         save_image=True
-        w = r'/home/ali/Desktop/GANomaly-tf2/export_model/64nz100-20221115-G-int8_edgetpu.tflite'
+        w = r'/home/ali/Desktop/GANomaly-tf2/export_model/32-nz100-ndf16-ngf16/32-nz100-ndf16-ngf16-20221116-G-int8_edgetpu.tflite'
         interpreter = get_interpreter(w,tflite=False,edgetpu=True)
-        line_loss = infer_python(test_data_dir,interpreter,SHOW_MAX_NUM,save_image=save_image, name='normal-20221115', isize=isize)
+        line_loss = infer_python(test_data_dir,interpreter,SHOW_MAX_NUM,save_image=save_image, name='normal-20221116', isize=isize)
         
     
-        noline_loss = infer_python(abnormal_test_data_dir,interpreter,SHOW_MAX_NUM, save_image=save_image, name='abnormal-20221115',isize=isize)
-        plot_loss_distribution(SHOW_MAX_NUM,line_loss,noline_loss,'loss_di_int8_64nz100-20221115')
-        plot_two_loss_histogram(line_loss,noline_loss,'line_noline_int8_64nz100-20221115')
-        
+        noline_loss = infer_python(abnormal_test_data_dir,interpreter,SHOW_MAX_NUM, save_image=save_image, name='abnormal-20221116',isize=isize)
+        plot_loss_distribution(SHOW_MAX_NUM,line_loss,noline_loss,'loss_di_int8_32nz100-20221116')
+        plot_two_loss_histogram(line_loss,noline_loss,'line_noline_int8_32nz100-20221116')
+        Analysis = True
         if Analysis:
-            Analysis_two_list(line_loss, noline_loss, 'count-histogram-20221115')
+            Analysis_two_list(line_loss, noline_loss, 'count-histogram-20221116')
         #=================================================
         #if plt have QT error try
         #pip uninstall opencv-python
