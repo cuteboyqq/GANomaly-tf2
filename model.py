@@ -478,6 +478,9 @@ class GANomaly(GANRunner):
         abnormal = 0
         self.input = image
         self.latent_i, self.gen_img, self.latent_o = self.G(self.input)
+        
+        #self.gen_img = renormalize(self.gen_img,0,1)
+        
         self.pred_real, self.feat_real = self.D(self.input)
         self.pred_fake, self.feat_fake = self.D(self.gen_img)
         g_loss = self.g_loss()
@@ -538,17 +541,34 @@ class GANomaly(GANRunner):
     def infer_python(self, img_dir,SHOW_MAX_NUM,save_image=False,name='normal',isize=64):
         import glob
         import cv2
+        import numpy as np
+        #import torchvision
+        #import torch
+        #import imageio as iio
+        from PIL import Image
         image_list = glob.glob(os.path.join(img_dir,'*.jpg'))
         loss_list = []
         self.load_best()
         cnt = 0
+        USE_PIL = False
+        USE_OPENCV = True
         for image_path in image_list:
             #print(image_path)
+            
+            #image = torchvision.io.read_image(image_path)
+            if USE_PIL:
+                image = Image.open(image_path)
+                image = image.convert('RGB')
+                image = image.resize((isize,isize))
+                image = np.asarray(image)
             cnt+=1
-            image = cv2.imread(image_path)
-            #image = cv2.cvtColor(image,cv2.COLOR_BGR2RGB)
-            image = cv2.resize(image,(isize,isize))
+            if USE_OPENCV:
+                image = cv2.imread(image_path)
+                image = cv2.cvtColor(image,cv2.COLOR_BGR2RGB)
+                image = cv2.resize(image,(isize,isize))
+                
             #image = tf.expand_dims(image, axis=0)
+            
             image = image/255.0
            
             #tf.convert_to_tensor(image)
@@ -675,7 +695,48 @@ class GANomaly(GANRunner):
         plt.savefig(file_path)
         pyplot.show()
         
+    
+    def Analysis_two_list(self, normal_list, abnormal_list, name):
+        import math
+        import numpy
+        normal_count_list = [0]*13
+        abnormal_count_list = [0]*13
+        for i in range(len(normal_list)):
+            normal_count_list[int(normal_list[i])]+=1
+        print('normal_count_list')
+        for i in range(len(normal_count_list)):
+            print('{}: {}'.format(i,normal_count_list[i]))
         
+        for i in range(len(abnormal_list)):
+            abnormal_count_list[int(abnormal_list[i])]+=1
+        print('abnormal_count_list')
+        for i in range(len(abnormal_count_list)):
+            print('{}: {}'.format(i,abnormal_count_list[i]))
+        
+        overlap_normal_count = 0
+        overlap_abnormal_count = 0
+        overlap_count = 0
+        for i in range(len(normal_count_list)):
+            if normal_count_list[i]!=0 and abnormal_count_list[i]!=0:
+                overlap_normal_count += normal_count_list[i]
+                overlap_abnormal_count += abnormal_count_list[i]
+                overlap_count += min(normal_count_list[i],abnormal_count_list[i])
+        print('overlap_normal_count: {}'.format(overlap_normal_count))
+        print('overlap_abnormal_count: {}'.format(overlap_abnormal_count))
+        print('overlap_count: {}'.format(overlap_count))
+        
+        from matplotlib import pyplot
+        bins = numpy.linspace(0, 13, 100)
+        pyplot.hist(normal_list, bins, alpha=0.5, label='normal')
+        pyplot.hist(abnormal_list, bins, alpha=0.5, label='abnormal')
+        pyplot.legend(loc='upper right')
+        os.makedirs('./runs/detect',exist_ok=True)
+        filename = str(name) + '.jpg'
+        file_path = os.path.join('./runs/detect',filename)
+        pyplot.savefig(file_path)
+        pyplot.show()
+    
+    
     def _evaluate(self, test_dataset):
         an_scores = []
         gt_labels = []
