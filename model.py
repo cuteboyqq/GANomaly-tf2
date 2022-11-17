@@ -564,8 +564,9 @@ class GANomaly(GANRunner):
             cnt+=1
             if USE_OPENCV:
                 image = cv2.imread(image_path)
-                image = cv2.cvtColor(image,cv2.COLOR_BGR2RGB)
                 image = cv2.resize(image,(isize,isize))
+                image = cv2.cvtColor(image,cv2.COLOR_BGR2RGB)
+                
                 
             #image = tf.expand_dims(image, axis=0)
             
@@ -595,8 +596,12 @@ class GANomaly(GANRunner):
         #for step, (images, y_batch_train) in enumerate(test_dataset):
         cnt=1
         os.makedirs('./runs/detect',exist_ok=True)
+        
+        image_dbg = None
+        
         while(show_num < SHOW_MAX_NUM):
             images, labels = dataiter.next()
+            #image_dbg = images
             #latent_i, fake_img, latent_o = self.G(images)
             self.input = images
             
@@ -635,6 +640,40 @@ class GANomaly(GANRunner):
             #if show_num%20==0:
                 #print(show_num)
         return loss_list
+    
+    def infer_dbg(self, test_dataset, image_opencv, SHOW_MAX_NUM,show_img,data_type):
+        
+
+        show_num = 0
+        self.load_best()
+                
+        loss_list = []
+
+
+        for step, (images, y_batch_train) in enumerate(test_dataset):
+ 
+            #latent_i, fake_img, latent_o = self.G(images)
+            self.input = images
+            
+            self.latent_i, self.gen_img, self.latent_o = self.G(self.input)
+            self.pred_real, self.feat_real = self.D(self.input)
+            self.pred_fake, self.feat_fake = self.D(self.gen_img)
+            g_loss = self.g_loss()
+            
+            ######
+            self.input = image_opencv
+            
+            self.latent_i, self.gen_img, self.latent_o = self.G(self.input)
+            self.pred_real, self.feat_real = self.D(self.input)
+            self.pred_fake, self.feat_fake = self.D(self.gen_img)
+            g_loss_opencv = self.g_loss()
+            
+            
+            print('tf loss = {}'.format(g_loss))
+            print('opencv loss = {}'.format(g_loss_opencv))
+            
+          
+
     def plot_images(self,images,outputs):
         # plot the first ten input images and then reconstructed images
         fig, axes = plt.subplots(nrows=2, ncols=15, sharex=True, sharey=True, figsize=(25,4))
@@ -655,9 +694,11 @@ class GANomaly(GANRunner):
         x = [i for i in range(SHOW_MAX_NUM)]
         y = positive_loss
         z = defeat_loss
-        print(x)
-        print(positive_loss)
-        print(defeat_loss)
+        #print(x)
+        #print(positive_loss)
+        #print(defeat_loss)
+        print('positive_loss: {}'.format(len(positive_loss)))
+        print('defeat_loss: {}'.format(len(defeat_loss)))
         # Plot a simple line chart
         #plt2.plot(x, y)
         # Plot another line on the same chart/graph
@@ -735,7 +776,57 @@ class GANomaly(GANRunner):
         file_path = os.path.join('./runs/detect',filename)
         pyplot.savefig(file_path)
         pyplot.show()
+        
+        
+        normal_acc,abnormal_acc = self.Get_lossTH_Accuracy(normal_count_list,abnormal_count_list)
+        
+        
+        return normal_count_list,abnormal_count_list,normal_acc,abnormal_acc
     
+    def Analysis_Accuracy(self, normal_count_list,abnormal_count_list,loss_th=3.0):
+        show_log = False
+        normal_correct_cnt = 0
+        total_normal_cnt = 0
+        for i in range(len(normal_count_list)):
+            total_normal_cnt+=normal_count_list[i]
+            if i < loss_th:
+                normal_correct_cnt+=normal_count_list[i]
+        if show_log:
+            print('normal_correct_cnt: {}'.format(normal_correct_cnt))
+            print('total_normal_cnt: {}'.format(total_normal_cnt))
+        normal_acc = float(normal_correct_cnt/total_normal_cnt)
+        
+        total_abnormal_cnt = 0
+        abnormal_correct_cnt = 0
+        for i in range(len(abnormal_count_list)):
+            total_abnormal_cnt+=abnormal_count_list[i]
+            if i >= loss_th:
+                abnormal_correct_cnt+=abnormal_count_list[i]
+        if show_log:
+            print('abnormal_correct_cnt : {}'.format(abnormal_correct_cnt))
+            print('total_abnormal_cnt: {}'.format(total_abnormal_cnt))
+        abnormal_acc = float(abnormal_correct_cnt / total_abnormal_cnt)
+        
+        
+        return normal_acc,abnormal_acc
+    
+    
+    def Get_lossTH_Accuracy(self, normal_count_list,abnormal_count_list):
+        normal_acc_list,abnormal_acc_list=[0.0]*10,[0.0]*10
+        
+        for i in range(len(normal_acc_list)):
+            normal_acc,abnormal_acc = self.Analysis_Accuracy(normal_count_list,abnormal_count_list,i)
+                  
+            normal_acc_list[i] = normal_acc
+            abnormal_acc_list[i] = abnormal_acc
+            
+        for i in range(len(normal_acc_list)):
+            print('loss {} ,normal acc: {} ,abnormal acc{}'.format(i,normal_acc_list[i],abnormal_acc_list[i]))
+            
+        return normal_acc,abnormal_acc
+                
+        
+        
     
     def _evaluate(self, test_dataset):
         an_scores = []
@@ -810,7 +901,7 @@ class GANomaly(GANRunner):
         self.err_g_adv = self.l_adv(self.feat_real, self.feat_fake)
         self.err_g_con = self.l_con(self.input, self.gen_img)
         self.err_g_enc = self.l_enc(self.latent_i, self.latent_o)
-        g_loss = self.err_g_adv * self.opt.w_adv + \
+        g_loss= self.err_g_adv * self.opt.w_adv + \
                 self.err_g_con * self.opt.w_con + \
                 self.err_g_enc * self.opt.w_enc
         return g_loss
