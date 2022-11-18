@@ -62,7 +62,7 @@ def main(_):
     infer_one_image = False
     infer_images = True
     show_img = False
-    TRAIN = True
+    TRAIN = False
     opt = FLAGS
     # logging
     logging.set_verbosity(logging.INFO)

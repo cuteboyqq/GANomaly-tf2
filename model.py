@@ -502,21 +502,25 @@ class GANomaly(GANRunner):
             os.makedirs(save_ori_image_dir,exist_ok=True)
             os.makedirs(save_gen_image_dir,exist_ok=True)
             
-            ori_image = tf.squeeze(self.input)
-            ori_image = renormalize(ori_image,0,255)
-            ori_image = ori_image.cpu().numpy()
+            #ori_image = tf.squeeze(self.input)
+            #ori_image = renormalize(ori_image,0,255)
+            ori_image = np.squeeze(image)
+            ori_image = ori_image*255
+            ori_image = cv2.cvtColor(ori_image,cv2.COLOR_RGB2BGR)
+            #ori_image = ori_image.cpu().numpy()
             filename = 'ori_image_' + str(cnt) + '.jpg'
             file_path = os.path.join(save_ori_image_dir, filename)
             cv2.imwrite(file_path, ori_image)
             #cv2.imshow('ori_img',ori_image)
             #cv2.waitKey(10)
             out_image = tf.squeeze(self.gen_img)  
-            out_image = renormalize(out_image,0,255)
             #out_image = renormalize(out_image,0,255)
-            #out_image = out_image*255
-               
+            #out_image = renormalize(out_image,0,255)
+            out_image = out_image.numpy()
+            out_image = out_image*255
+            out_image = cv2.cvtColor(out_image,cv2.COLOR_RGB2BGR)  
             
-            out_image = out_image.cpu().numpy()
+            #out_image = out_image.cpu().numpy()
             #out_image = np.squeeze(out_image)
             #out_image = renormalize(out_image)
             
