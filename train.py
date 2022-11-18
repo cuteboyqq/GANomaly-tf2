@@ -14,13 +14,13 @@ from absl import logging
 FLAGS = flags.FLAGS
 flags.DEFINE_integer("shuffle_buffer_size", 10000,
                      "buffer size for pseudo shuffle")
-flags.DEFINE_integer("batch_size", 64, "batch_size")
+flags.DEFINE_integer("batch_size", 32, "batch_size")
 flags.DEFINE_integer("isize", 32, "input size")
 flags.DEFINE_string("ckpt_dir", 'ckpt', "checkpoint folder")
 flags.DEFINE_integer("nz", 100, "latent dims")
 flags.DEFINE_integer("nc", 3, "input channels")
-flags.DEFINE_integer("ndf", 16, "number of discriminator's filters")
-flags.DEFINE_integer("ngf", 16, "number of generator's filters")
+flags.DEFINE_integer("ndf", 64, "number of discriminator's filters")
+flags.DEFINE_integer("ngf", 64, "number of generator's filters")
 flags.DEFINE_integer("extralayers", 0, "extralayers for both G and D")
 flags.DEFINE_list("encdims", None, "Layer dimensions of the encoder and in reverse of the decoder."
                                    "If given, dense encoder and decoders are used.")
@@ -57,12 +57,12 @@ def process(image,label):
     return image,label
 
 def main(_):
-    show_loss_histogram = True
-    show_loss_distribution = True
+    show_loss_histogram = False
+    show_loss_distribution = False
     infer_one_image = False
-    infer_images = False
+    infer_images = True
     show_img = False
-    TRAIN = False
+    TRAIN = True
     opt = FLAGS
     # logging
     logging.set_verbosity(logging.INFO)

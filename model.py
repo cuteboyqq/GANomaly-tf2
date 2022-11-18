@@ -493,10 +493,11 @@ class GANomaly(GANRunner):
             abnormal=0
             print('normal')
             
-            
+        g_loss_str = str(int(g_loss))
+        
         if save_img:
-            save_ori_image_dir = os.path.join('./runs/detect',name,'ori_images')
-            save_gen_image_dir = os.path.join('./runs/detect',name,'gen_images')
+            save_ori_image_dir = os.path.join('./runs/detect',name,'ori_images',g_loss_str)
+            save_gen_image_dir = os.path.join('./runs/detect',name,'gen_images',g_loss_str)
 
             os.makedirs(save_ori_image_dir,exist_ok=True)
             os.makedirs(save_gen_image_dir,exist_ok=True)
