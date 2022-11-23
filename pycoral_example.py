@@ -113,10 +113,7 @@ def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True, save_image=
     from PIL import Image
     from matplotlib import pyplot as plt
     # Lite or Edge TPU
-    save_ori_image_dir = os.path.join('./runs/detect',name,'ori_images')
-    save_gen_image_dir = os.path.join('./runs/detect',name,'gen_images')
-    os.makedirs(save_ori_image_dir,exist_ok=True)
-    os.makedirs(save_gen_image_dir,exist_ok=True)
+    
     
     
     
@@ -153,11 +150,13 @@ def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True, save_image=
         input()
         '''
         #input_img = im
+        '''
         if save_image:
         #cv2.imshow('ori_image',im)
             filename = 'ori_image_' + str(cnt) + '.jpg'
             file_path = os.path.join(save_ori_image_dir, filename)
             cv2.imwrite(file_path,im_ori)
+            '''
             #cv2.waitKey(10)
                       
     #im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
@@ -210,11 +209,13 @@ def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True, save_image=
             gen_img = np.squeeze(gen_img)
             gen_img = cv2.cvtColor(gen_img, cv2.COLOR_RGB2BGR)
             #print('after squeeze & numpy x : {}'.format(x))
+            '''
             if save_image:
                 #cv2.imshow('out_image',gen_img)
                 filename = 'out_image_' + str(cnt) + '.jpg'
                 file_path = os.path.join(save_gen_image_dir,filename)
                 cv2.imwrite(file_path,gen_img)
+                '''
                 #cv2.waitKey(10)
             #gen_img = renormalize(gen_img)
             #gen_img = tf.transpose(gen_img, perm=[0,1,2])
@@ -241,6 +242,31 @@ def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True, save_image=
         print('latent_i : {}'.format(latent_i))
         print('latent_o : {}'.format(latent_o))
     _g_loss = g_loss(input_img/255.0, gen_img/255.0, latent_i, latent_o)
+    
+    
+    _g_loss_str = str(int(_g_loss))
+    if save_image:
+        #cv2.imshow('ori_image',im)
+        
+        save_ori_image_dir = os.path.join('./runs/detect',name,'ori_images')
+        save_gen_image_dir = os.path.join('./runs/detect',name,'gen_images')
+        os.makedirs(save_ori_image_dir,exist_ok=True)
+        os.makedirs(save_gen_image_dir,exist_ok=True)
+        
+        filename = 'ori_image_' + str(cnt) + '.jpg'
+        file_path = os.path.join(save_ori_image_dir, _g_loss_str, filename)
+        file_dir = os.path.join(save_ori_image_dir, _g_loss_str)
+        os.makedirs(file_dir,exist_ok=True)
+        cv2.imwrite(file_path,im_ori)
+        
+        filename = 'out_image_' + str(cnt) + '.jpg'
+        file_path = os.path.join(save_gen_image_dir, _g_loss_str, filename)
+        file_dir = os.path.join(save_gen_image_dir, _g_loss_str)
+        os.makedirs(file_dir,exist_ok=True)
+        cv2.imwrite(file_path,gen_img)
+        
+        
+    
     #_g_loss = 888
     if SHOW_LOG:
         print('g_loss : {}'.format(_g_loss))
