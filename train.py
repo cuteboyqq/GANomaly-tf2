@@ -306,6 +306,13 @@ def main(_):
             normal_name =  str(opt.isize) + 'nz' + str(opt.nz) + '-' + str(SHOW_MAX_NUM) + '-opencv-normal' + '-ndf' + str(opt.ndf) + '-ngf' + str(opt.ngf)
             loss_normal_list = ganomaly.infer_python(img_dir,SHOW_MAX_NUM,save_image=True,name=normal_name,isize=opt.isize)
             
+            #================
+            #  define loss TH
+            #================
+            # User Define Loss TH
+            user_loss_list = [0,0.25,0.5,0.7,0.8,0.9,1.0,1.25,1.5,1.75,2.0,3.0,4.0]
+            print('len(user_loss_list) : {}'.format(len(user_loss_list)))
+            
             img_dir = r'/home/ali/GitHub_Code/YOLO/YOLOV5/runs/detect/factory_data/defect_aug/noline'
             abnormal_name =  str(opt.isize) + 'nz' + str(opt.nz) + '-' + str(SHOW_MAX_NUM) + '-opencv-abnormal' + '-ndf' + str(opt.ndf) + '-ngf' + str(opt.ngf)
             loss_abnormal_list = ganomaly.infer_python(img_dir,SHOW_MAX_NUM,save_image=True,name=abnormal_name,isize=opt.isize)
@@ -320,7 +327,7 @@ def main(_):
             print('Finish plot_two_loss_histogram')
             analysis_name =  str(opt.isize) + 'nz' + str(opt.nz) + '-' + str(SHOW_MAX_NUM) + '-opencv-analysis' + '-ndf' + str(opt.ndf) + '-ngf' + str(opt.ngf)
             ganomaly.Analysis_two_list(loss_normal_list, loss_abnormal_list, analysis_name)
-            
+            ganomaly.Analysis_two_list_UserDefineLossTH(loss_normal_list, loss_abnormal_list, analysis_name, user_loss_list)
     #print(loss_list)
     #print(loss_abnormal_list)
 if __name__ == '__main__':
