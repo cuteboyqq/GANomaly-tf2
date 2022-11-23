@@ -483,7 +483,9 @@ class GANomaly(GANRunner):
         
         self.pred_real, self.feat_real = self.D(self.input)
         self.pred_fake, self.feat_fake = self.D(self.gen_img)
-        g_loss = self.g_loss()
+        g_loss, adv_loss, con_loss, enc_loss = self.g_loss_infer()
+        
+        adv_loss, con_loss, enc_loss = adv_loss.numpy(), con_loss.numpy(), enc_loss.numpy()
         
         print('{} loss: {}'.format(cnt,g_loss))
         if g_loss>2.0:
@@ -494,6 +496,11 @@ class GANomaly(GANRunner):
             print('normal')
             
         g_loss_str = str(int(g_loss))
+        
+        loss_str = '_' + str(adv_loss) + '_' + str(con_loss) + '_' + str(enc_loss)
+        
+        SHOW_LOSS_STR = True
+        
         
         if save_img:
             save_ori_image_dir = os.path.join('./runs/detect',name,'ori_images',g_loss_str)
@@ -508,7 +515,10 @@ class GANomaly(GANRunner):
             ori_image = ori_image*255
             ori_image = cv2.cvtColor(ori_image,cv2.COLOR_RGB2BGR)
             #ori_image = ori_image.cpu().numpy()
-            filename = 'ori_image_' + str(cnt) + '.jpg'
+            if SHOW_LOSS_STR:
+                filename = 'ori_image_' + str(cnt) + loss_str + '.jpg'
+            else:
+                filename = 'ori_image_' + str(cnt)  + '.jpg'
             file_path = os.path.join(save_ori_image_dir, filename)
             cv2.imwrite(file_path, ori_image)
             #cv2.imshow('ori_img',ori_image)
@@ -523,8 +533,10 @@ class GANomaly(GANRunner):
             #out_image = out_image.cpu().numpy()
             #out_image = np.squeeze(out_image)
             #out_image = renormalize(out_image)
-            
-            filename = 'out_image_' + str(cnt) + '.jpg'
+            if SHOW_LOSS_STR:
+                filename = 'out_image_' + str(cnt) + loss_str + '.jpg'
+            else:
+                filename = 'out_image_' + str(cnt) + '.jpg'
             file_path = os.path.join(save_gen_image_dir,filename)
             cv2.imwrite(file_path, out_image)
             #cv2.imshow('gen_img',out_image)
@@ -910,6 +922,16 @@ class GANomaly(GANRunner):
                 self.err_g_con * self.opt.w_con + \
                 self.err_g_enc * self.opt.w_enc
         return g_loss
+    
+    
+    def g_loss_infer(self):
+        self.err_g_adv = self.l_adv(self.feat_real, self.feat_fake)
+        self.err_g_con = self.l_con(self.input, self.gen_img)
+        self.err_g_enc = self.l_enc(self.latent_i, self.latent_o)
+        g_loss= self.err_g_adv * self.opt.w_adv + \
+                self.err_g_con * self.opt.w_con + \
+                self.err_g_enc * self.opt.w_enc
+        return g_loss, self.err_g_adv * self.opt.w_adv, self.err_g_con * self.opt.w_con, self.err_g_enc * self.opt.w_enc
 
     def d_loss(self):
         self.err_d_real = self.l_bce(self.pred_real, self.real_label)
