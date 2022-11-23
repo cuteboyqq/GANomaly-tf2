@@ -96,6 +96,7 @@ def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True, save_image=
     INFER=False
     ONLY_DETECT_ONE_IMAGE=True
     USE_PIL = False
+    
     USE_OPENCV = True
     if interpreter is None:
         print('interpreter is None, get interpreter now')
@@ -116,6 +117,9 @@ def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True, save_image=
     save_gen_image_dir = os.path.join('./runs/detect',name,'gen_images')
     os.makedirs(save_ori_image_dir,exist_ok=True)
     os.makedirs(save_gen_image_dir,exist_ok=True)
+    
+    
+    
     if INFER:
         input_img = im
         #im = tf.transpose(im, perm=[0,1,2,3])
@@ -124,22 +128,36 @@ def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True, save_image=
         #plt.show()
     elif ONLY_DETECT_ONE_IMAGE:
         if USE_PIL:
-            im = Image.open(im)
-            im = im.convert('RGB')
-            im = im.resize((isize,isize))
-            im = np.asarray(im)
+            im_p = Image.open(im)
+            im_p = im_p.convert('RGB')
+            im_p = im_p.resize((isize,isize),resample=2) #bicubic
+            im = np.asarray(im_p)
             input_img = im
         if USE_OPENCV:
-            im = cv2.imread(im)
-            im = cv2.resize(im, (isize, isize))
+            im_o = cv2.imread(im)
+            im_ori = cv2.resize(im_o, (isize, isize)) #lininear
+            im = cv2.cvtColor(im_ori, cv2.COLOR_BGR2RGB)
             input_img = im
-            im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
+        '''
+        diff = np.sum(im_p[:, :, 0] - im_o[:, :, 0])
+        
+        print('image p.shape = {}'.format(im_p.shape))
+        print('image o.shape = {}'.format(im_o.shape))
+        
+        print('image p.10 element = {}'.format(im_p[0:10, 0, 0]))
+        print('image o.10 element = {}'.format(im_o[0:10, 0, 0]))
+        
+        print('image diff = {}'.format(diff))
+        
+        
+        input()
+        '''
         #input_img = im
         if save_image:
         #cv2.imshow('ori_image',im)
             filename = 'ori_image_' + str(cnt) + '.jpg'
             file_path = os.path.join(save_ori_image_dir, filename)
-            cv2.imwrite(file_path,im)
+            cv2.imwrite(file_path,im_ori)
             #cv2.waitKey(10)
                       
     #im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
@@ -218,7 +236,7 @@ def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True, save_image=
         print('gen_img : {}'.format(gen_img))
         print('gen_img : {}'.format(gen_img.shape))
     latent_i = y[0]
-    latent_o = y[1]
+    latent_o = y[2]
     if SHOW_LOG:
         print('latent_i : {}'.format(latent_i))
         print('latent_o : {}'.format(latent_o))
@@ -406,6 +424,104 @@ def infer_python(img_dir,interpreter,SHOW_MAX_NUM,save_image=False,name='normal'
     
     return loss_list
 
+
+def Analysis_two_list_UserDefineLossTH(normal_list, abnormal_list, name, user_loss_list=None):
+    show_log = False
+    import math
+    import numpy
+    normal_count_list = [0]*len(user_loss_list)
+    abnormal_count_list = [0]*len(user_loss_list)
+
+    user_loss_list = sorted(user_loss_list)
+
+    if show_log:
+        print('normal_list : {}'.format(normal_list))
+        print('abnormal_list : {}'.format(abnormal_list))
+        print('user_loss_list : {}'.format(user_loss_list))
+
+    for i in range(len(user_loss_list)):
+        for j in range(len(normal_list)):
+            if (i+1) < len(user_loss_list):
+                if normal_list[j] >= user_loss_list[i] and  normal_list[j] < user_loss_list[i+1]:
+                    normal_count_list[i]+=1
+            else:
+                if normal_list[j] >= user_loss_list[i]:
+                    normal_count_list[i]+=1
+
+    for i in range(len(user_loss_list)):
+        for j in range(len(abnormal_list)):
+            if (i+1) < len(user_loss_list):
+                if abnormal_list[j] >= user_loss_list[i] and  abnormal_list[j] < user_loss_list[i+1]:
+                    abnormal_count_list[i]+=1
+            else:
+                if abnormal_list[j] >= user_loss_list[i]:
+                    abnormal_count_list[i]+=1
+            
+    normal_acc,abnormal_acc = Get_lossTH_Accuracy_UserDefineLossTH(normal_count_list,abnormal_count_list, user_loss_list)
+
+    print('user_loss_list: {}'.format(user_loss_list))
+
+    print('normal_count_list:') 
+    for i in range(len(user_loss_list)):
+        print('{} : {}'.format(user_loss_list[i], normal_count_list[i]))
+        
+    print('abnormal_count_list:')
+    for i in range(len(user_loss_list)):
+        print('{} : {}'.format(user_loss_list[i], abnormal_count_list[i]))
+        
+        
+    #print('normal_count_list: {}'.format(normal_count_list))
+    #print('abnormal_count_list: {}'.format(abnormal_count_list))
+
+    return normal_count_list,abnormal_count_list,normal_acc,abnormal_acc
+
+def Get_lossTH_Accuracy_UserDefineLossTH(normal_count_list,abnormal_count_list, user_loss_list):
+    normal_acc_list,abnormal_acc_list=[0.0]*len(user_loss_list),[0.0]*len(user_loss_list)
+
+    for i in range(len(user_loss_list)):
+        normal_acc,abnormal_acc = Analysis_Accuracy_UserDefineLossTH(normal_count_list,abnormal_count_list,user_loss_list[i],user_loss_list)
+              
+        normal_acc_list[i] = normal_acc
+        abnormal_acc_list[i] = abnormal_acc
+        
+    for i in range(len(user_loss_list)):
+        print('loss {} ,normal acc: {} ,abnormal acc{}'.format(user_loss_list[i],normal_acc_list[i],abnormal_acc_list[i]))
+        
+    return normal_acc,abnormal_acc
+
+def Analysis_Accuracy_UserDefineLossTH(normal_count_list,abnormal_count_list,loss_th=3.0, user_loss_list=None):
+    show_log = False
+    normal_correct_cnt = 0
+    total_normal_cnt = 0
+    for i in range(len(normal_count_list)):
+        total_normal_cnt+=normal_count_list[i]
+        if user_loss_list[i] < loss_th:
+            normal_correct_cnt+=normal_count_list[i]
+    if show_log:
+        print('normal_correct_cnt: {}'.format(normal_correct_cnt))
+        print('total_normal_cnt: {}'.format(total_normal_cnt))
+    if total_normal_cnt == 0:
+        normal_acc = 0.0
+    else:
+        normal_acc = float(normal_correct_cnt/total_normal_cnt)
+
+    total_abnormal_cnt = 0
+    abnormal_correct_cnt = 0
+    for i in range(len(abnormal_count_list)):
+        total_abnormal_cnt+=abnormal_count_list[i]
+        if user_loss_list[i] >= loss_th:
+            abnormal_correct_cnt+=abnormal_count_list[i]
+    if show_log:
+        print('abnormal_correct_cnt : {}'.format(abnormal_correct_cnt))
+        print('total_abnormal_cnt: {}'.format(total_abnormal_cnt))
+    if total_abnormal_cnt==0:
+        abnormal_acc = 0
+    else:
+        abnormal_acc = float(abnormal_correct_cnt / total_abnormal_cnt)
+
+
+    return normal_acc,abnormal_acc
+
 if __name__=="__main__":
     PYCORAL = False
     DETECT = False
@@ -442,17 +558,20 @@ if __name__=="__main__":
         shuffle = False
         SHOW_MAX_NUM = 2000
         save_image=True
-        w = r'/home/ali/Desktop/GANomaly-tf2/export_model/32-nz100-ndf16-ngf16/32-nz100-ndf16-ngf16-20221116-G-int8_edgetpu.tflite'
+        w = r'/home/ali/Desktop/GANomaly-tf2/export_model/32-nz100-ndf64-ngf64/ckpt-32-nz100-ndf64-ngf64-20221123-G-int8_edgetpu.tflite'
         interpreter = get_interpreter(w,tflite=False,edgetpu=True)
-        line_loss = infer_python(test_data_dir,interpreter,SHOW_MAX_NUM,save_image=save_image, name='normal-20221116', isize=isize)
+        line_loss = infer_python(test_data_dir,interpreter,SHOW_MAX_NUM,save_image=save_image, name='normal-20221123', isize=isize)
         
     
-        noline_loss = infer_python(abnormal_test_data_dir,interpreter,SHOW_MAX_NUM, save_image=save_image, name='abnormal-20221116',isize=isize)
-        plot_loss_distribution(SHOW_MAX_NUM,line_loss,noline_loss,'loss_di_int8_32nz100-20221116')
-        plot_two_loss_histogram(line_loss,noline_loss,'line_noline_int8_32nz100-20221116')
+        noline_loss = infer_python(abnormal_test_data_dir,interpreter,SHOW_MAX_NUM, save_image=save_image, name='abnormal-20221123',isize=isize)
+        plot_loss_distribution(SHOW_MAX_NUM,line_loss,noline_loss,'loss_di_int8_32nz100-20221123')
+        plot_two_loss_histogram(line_loss,noline_loss,'line_noline_int8_32nz100-20221123')
         Analysis = True
         if Analysis:
-            Analysis_two_list(line_loss, noline_loss, 'count-histogram-20221116')
+            #Analysis_two_list(line_loss, noline_loss, 'count-histogram-20221123')
+            user_loss_list = [0,0.25,0.5,0.7,0.8,0.9,1.0,1.25,1.5,1.75,2.0,3.0,4.0]
+            print('len(user_loss_list) : {}'.format(len(user_loss_list)))
+            Analysis_two_list_UserDefineLossTH(line_loss, noline_loss, 'count-histogram-20221123', user_loss_list)
         #=================================================
         #if plt have QT error try
         #pip uninstall opencv-python
