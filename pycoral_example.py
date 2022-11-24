@@ -133,7 +133,10 @@ def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True, save_image=
         if USE_OPENCV:
             im_o = cv2.imread(im)
             im_ori = cv2.resize(im_o, (isize, isize)) #lininear
-            im = cv2.cvtColor(im_ori, cv2.COLOR_BGR2RGB)
+            #im = cv2.cvtColor(im_ori, cv2.COLOR_BGR2RGB)
+            im = im_ori.transpose((2,0,1))[::-1] #HWC to CHW , BGR to RGB
+            im = np.ascontiguousarray(im)
+            im = np.transpose(im,[1,2,0])
             input_img = im
         '''
         diff = np.sum(im_p[:, :, 0] - im_o[:, :, 0])
@@ -160,9 +163,11 @@ def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True, save_image=
             #cv2.waitKey(10)
                       
     #im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
-    im = im/255.0
     
-    im = im[np.newaxis, ...].astype(np.float32)
+    
+    #im = im[np.newaxis, ...].astype(np.float32)
+    im = np.expand_dims(im, axis=0).astype(np.float32)
+    im = im/255.0
     if SHOW_LOG:
         print('im : {}'.format(im.shape))
     
@@ -206,8 +211,8 @@ def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True, save_image=
             
             gen_img = x*255
             
-            gen_img = np.squeeze(gen_img)
-            gen_img = cv2.cvtColor(gen_img, cv2.COLOR_RGB2BGR)
+            gen_img_for_loss = np.squeeze(gen_img)
+            gen_img = cv2.cvtColor(gen_img_for_loss, cv2.COLOR_RGB2BGR)
             #print('after squeeze & numpy x : {}'.format(x))
             '''
             if save_image:
@@ -241,7 +246,7 @@ def detect_image(w, im, interpreter=None, tflite=False,edgetpu=True, save_image=
     if SHOW_LOG:
         print('latent_i : {}'.format(latent_i))
         print('latent_o : {}'.format(latent_o))
-    _g_loss = g_loss(input_img/255.0, gen_img/255.0, latent_i, latent_o)
+    _g_loss = g_loss(input_img/255.0, gen_img_for_loss/255.0, latent_i, latent_o)
     
     
     _g_loss_str = str(int(_g_loss))
@@ -576,28 +581,29 @@ if __name__=="__main__":
         
     if INFER:
         #import tensorflow as tf
-        test_data_dir = r'/home/ali/Desktop/factory_data/f_for_rasp/crops_line/line'
-        abnormal_test_data_dir = r'/home/ali/Desktop/factory_data/f_for_rasp/crops_noline/noline'
+        test_data_dir = r'/home/ali/Desktop/factory_data/crops_line/line'
+        abnormal_test_data_dir = r'/home/ali/Desktop/factory_data/defect_aug/noline'
         (img_height, img_width) = (32,32)
         isize=32
         batch_size_ = 1
         shuffle = False
-        SHOW_MAX_NUM = 2000
+        SHOW_MAX_NUM = 7800
         save_image=True
-        w = r'/home/ali/Desktop/GANomaly-tf2/export_model/32-nz100-ndf64-ngf64/ckpt-32-nz100-ndf64-ngf64-20221123-G-int8_edgetpu.tflite'
+        w = r'/home/ali/Desktop/GANomaly-tf2/export_model/32-nz100-ndf64-ngf64/ckpt-32-nz100-ndf64-ngf64-20221124-G-int8_edgetpu.tflite'
         interpreter = get_interpreter(w,tflite=False,edgetpu=True)
-        line_loss = infer_python(test_data_dir,interpreter,SHOW_MAX_NUM,save_image=save_image, name='normal-20221123', isize=isize)
+        line_loss = infer_python(test_data_dir,interpreter,SHOW_MAX_NUM,save_image=save_image, name='normal-20221124', isize=isize)
         
-    
-        noline_loss = infer_python(abnormal_test_data_dir,interpreter,SHOW_MAX_NUM, save_image=save_image, name='abnormal-20221123',isize=isize)
-        plot_loss_distribution(SHOW_MAX_NUM,line_loss,noline_loss,'loss_di_int8_32nz100-20221123')
-        plot_two_loss_histogram(line_loss,noline_loss,'line_noline_int8_32nz100-20221123')
-        Analysis = True
+        noline_loss = [5]*7800
+        #noline_loss = infer_python(abnormal_test_data_dir,interpreter,SHOW_MAX_NUM, save_image=save_image, name='abnormal-20221124',isize=isize)
+        plot_loss_distribution(SHOW_MAX_NUM,line_loss,noline_loss,'loss_di_int8_32nz100-20221124')
+        plot_two_loss_histogram(line_loss,noline_loss,'line_noline_int8_32nz100-20221124')
+        Analysis = False
         if Analysis:
             #Analysis_two_list(line_loss, noline_loss, 'count-histogram-20221123')
-            user_loss_list = [0,0.25,0.5,0.7,0.8,0.9,1.0,1.25,1.5,1.75,2.0,3.0,4.0]
+            user_loss_list = [0,0.25,0.5,0.7,0.8,0.9,1.0,1.1,1.2,1.3,1.4,1.5,1.75,2.0,3.0,4.0,5.0,6.0]
+            #user_loss_list = [0.0,1.0,2.0,3.0,4.0,5.0,6.0,7.0,8.0,9.0,10.0,11.0,12.0]
             print('len(user_loss_list) : {}'.format(len(user_loss_list)))
-            Analysis_two_list_UserDefineLossTH(line_loss, noline_loss, 'count-histogram-20221123', user_loss_list)
+            Analysis_two_list_UserDefineLossTH(line_loss, noline_loss, 'count-histogram-20221124', user_loss_list)
         #=================================================
         #if plt have QT error try
         #pip uninstall opencv-python
