@@ -53,20 +53,8 @@ class Conv_BN_Act(tf.keras.layers.Layer):
 
     def call(self, x):
         x = self.conv(x)
-        #x = self.bn(x) if self.is_bn else x
-        if self.is_bn:
-            x = self.bn(x)
-        else:
-            x = x
-        
-        #x = self.bn(x)
-        #x = x if self.erase_act else self.act(x)
-        if self.erase_act:
-            x = x
-        else:
-            x = self.act(x)
-        #x = self.act(x)
-        
+        x = self.bn(x) if self.is_bn else x
+        x = x if self.erase_act else self.act(x)
         return x
 
 
@@ -105,7 +93,6 @@ class Encoder(tf.keras.layers.Layer):
             self.extra_blocks.append(extra)
 
         self.body_blocks = []
-        '''
         while csize > 4:
             in_feat = cndf
             out_feat = cndf * 2
@@ -116,23 +103,7 @@ class Encoder(tf.keras.layers.Layer):
             self.body_blocks.append(body)
             cndf = cndf * 2
             csize = csize / 2
-        '''
-        #=============================================
-        #16
-        body = Conv_BN_Act(filters=128,
-                           ks=4,
-                           act_type='PRelu',
-                           strides=2)
-        
-        self.body_blocks.append(body)
-        #8
-        body = Conv_BN_Act(filters=256,
-                           ks=4,
-                           act_type='PRelu',
-                           strides=2)
-        self.body_blocks.append(body)
-        #============================================
-        
+
         # state size. K x 4 x 4
         self.output_features = output_features
         self.out_conv = layers.Conv2D(filters=nz,
@@ -189,13 +160,11 @@ class DenseEncoder(tf.keras.layers.Layer):
             x = block(x)
         last_features = x
         out = self.out_act(last_features)
-        
         if self.output_features:
             return out, last_features
         else:
             return out
-        
-        #return out, last_features
+
 
 class Decoder(tf.keras.layers.Layer):
     def __init__(self, isize, nz, nc, ngf, n_extra_layers=0):
@@ -209,12 +178,10 @@ class Decoder(tf.keras.layers.Layer):
         super(Decoder, self).__init__()
         assert isize % 16 == 0, "isize has to be a multiple of 16"
         cngf, tisize = ngf // 2, 4
-        '''
         while tisize != isize:
             cngf = cngf * 2
             tisize = tisize * 2
-        '''
-        cngf = 256
+
         self.in_block = Conv_BN_Act(filters=cngf,
                                     ks=4,
                                     act_type='ReLU',
@@ -223,7 +190,6 @@ class Decoder(tf.keras.layers.Layer):
 
         csize, _ = 4, cngf
         self.body_blocks = []
-        '''
         while csize < isize // 2:
             body = Conv_BN_Act(filters=cngf // 2,
                                ks=4,
@@ -233,24 +199,7 @@ class Decoder(tf.keras.layers.Layer):
             self.body_blocks.append(body)
             cngf = cngf // 2
             csize = csize * 2
-        '''
-        #4
-        body = Conv_BN_Act(filters=128,
-                           ks=4,
-                           act_type='ReLU',
-                           strides=2,
-                           conv_tran=True)
-        self.body_blocks.append(body)
-        #8
-        body = Conv_BN_Act(filters=64,
-                           ks=4,
-                           act_type='ReLU',
-                           strides=2,
-                           conv_tran=True)
-        self.body_blocks.append(body)
-        
-        
-        
+
         # Extra layers
         self.extra_blocks = []
         for t in range(n_extra_layers):
